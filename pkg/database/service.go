@@ -4,11 +4,13 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/doug-martin/goqu/v9"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type DBService interface {
+	Dialect() goqu.DialectWrapper
 	Exec(ctx context.Context, query string, args []interface{}) error
 	Insert(ctx context.Context, sql string, args []interface{}, dest interface{}) error
 	Count(ctx context.Context, sql string, args []interface{}) (int64, error)
@@ -27,6 +29,11 @@ func NewDBService(pool *pgxpool.Pool) DBService {
 	return &dbService{
 		pool: pool,
 	}
+}
+
+// Dialect возвращает postgres диалект для goqu
+func (s *dbService) Dialect() goqu.DialectWrapper {
+	return goqu.Dialect("postgres")
 }
 
 // Exec выполняет запрос

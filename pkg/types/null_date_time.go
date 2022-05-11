@@ -60,3 +60,11 @@ func (t NullTimeHM) Value() (driver.Value, error) {
 
 	return t.Time.UTC().Format(NullTimeHMLayout), nil
 }
+
+func (t NullTimeHM) String() string {
+	if t.Time.IsZero() {
+		return ""
+	}
+
+	return t.Time.UTC().Format(NullTimeHMLayout)
+}
