@@ -18,6 +18,7 @@ import (
 
 type BaseIndexInterface interface {
 	Index(documentId string, data interface{}) (IndexResponse, error)
+	Get(documentId string) (SearchHit, error)
 	Delete(documentId string) error
 	Search(request esapi.SearchRequest) (SearchResponse, error)
 	SearchBy(term string, fields []string) (SearchResponse, error)
@@ -138,6 +139,32 @@ func (i *BaseIndex) Index(documentId string, data interface{}) (IndexResponse, e
 	}
 
 	return response, nil
+}
+
+// Get возвращает конкретный документ
+func (i *BaseIndex) Get(
+	documentId string,
+) (SearchHit, error) {
+	req := esapi.GetRequest{
+		Index:      i.alias,
+		DocumentID: documentId,
+	}
+
+	result, err := req.Do(context.Background(), i.client)
+	if err != nil {
+		return SearchHit{}, err
+	}
+	defer result.Body.Close()
+
+	if result.IsError() {
+		return SearchHit{}, errors.New(fmt.Sprintf("[%s] Get error: index=%s document=%s", result.Status(), i.alias, documentId))
+	}
+
+	var hit SearchHit
+	if err = json.NewDecoder(result.Body).Decode(&hit); err != nil {
+		return SearchHit{}, err
+	}
+	return hit, nil
 }
 
 // Delete удаляет документ из индекса
