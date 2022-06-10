@@ -23,7 +23,7 @@ func NewLocalStorage(directory string, urlPrefix string) StorageService {
 	}
 }
 
-func (s *localStorage) Save(path string, mimeType string, file io.ReadSeeker) error {
+func (s *localStorage) Save(path string, mimeType string, file io.Reader) error {
 	apath, err := s.getAbsolute(path)
 	if err != nil {
 		return err
