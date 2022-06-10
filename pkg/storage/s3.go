@@ -9,11 +9,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
 type s3Storage struct {
-	client *s3.S3
-	bucket string
+	s3Session *session.Session
+	bucket    string
 }
 
 func NewS3Storage(endpoint string, region string, bucket string, accessId string, secretId string) StorageService {
@@ -24,23 +25,26 @@ func NewS3Storage(endpoint string, region string, bucket string, accessId string
 	}))
 
 	return &s3Storage{
-		client: s3.New(newSession),
-		bucket: bucket,
+		s3Session: newSession,
+		bucket:    bucket,
 	}
 }
 
-func (s *s3Storage) Save(path string, mimeType string, file io.ReadSeeker) error {
-	put := &s3.PutObjectInput{
+func (s *s3Storage) Save(path string, mimeType string, file io.Reader) error {
+	upload := s3manager.UploadInput{
 		ACL:    aws.String("public-read"),
 		Body:   file,
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(path),
 	}
+
 	if mimeType != "" {
-		put.ContentType = aws.String(mimeType)
+		upload.ContentType = aws.String(mimeType)
 	}
 
-	_, err := s.client.PutObject(put)
+	uploader := s3manager.NewUploader(s.s3Session)
+
+	_, err := uploader.Upload(&upload)
 
 	return err
 }
@@ -50,7 +54,7 @@ func (s *s3Storage) Get(path string) (io.ReadCloser, error) {
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(path),
 	}
-	output, err := s.client.GetObject(get)
+	output, err := s3.New(s.s3Session).GetObject(get)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +62,7 @@ func (s *s3Storage) Get(path string) (io.ReadCloser, error) {
 }
 
 func (s *s3Storage) GetUrl(file string) (string, error) {
-	u, err := url.Parse(s.client.Endpoint)
+	u, err := url.Parse(s3.New(s.s3Session).Endpoint)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +75,7 @@ func (s *s3Storage) Delete(path string) error {
 		Key:    aws.String(path),
 		Bucket: aws.String(s.bucket),
 	}
-	_, err := s.client.DeleteObject(deleteInput)
+	_, err := s3.New(s.s3Session).DeleteObject(deleteInput)
 
 	return err
 }
@@ -81,7 +85,7 @@ func (s *s3Storage) List() ([]string, error) {
 		Bucket: aws.String(s.bucket),
 	}
 
-	objects, err := s.client.ListObjects(input)
+	objects, err := s3.New(s.s3Session).ListObjects(input)
 	if err != nil {
 		return nil, err
 	}
