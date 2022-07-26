@@ -1,6 +1,7 @@
 package types
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,8 @@ import (
 const DateLayout = "2006-01-02"
 const TimeLayout = "15:04:03"
 const TimeHMLayout = "15:04"
+
+const TimeHMLayoutDB = "15:04:00.000000"
 
 type Date struct {
 	time.Time
@@ -36,6 +39,15 @@ func (c Date) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 	return []byte(fmt.Sprintf(`"%s"`, c.Time.Format(DateLayout))), nil
+}
+
+func (c *Date) Scan(v interface{}) error {
+	c.Time = v.(time.Time)
+	return nil
+}
+
+func (c Date) Value() (driver.Value, error) {
+	return c.Time.Format(DateLayout), nil
 }
 
 func (c *Time) UnmarshalJSON(b []byte) (err error) {
@@ -68,4 +80,19 @@ func (c TimeHM) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 	return []byte(fmt.Sprintf(`"%s"`, c.Time.Format(TimeHMLayout))), nil
+}
+
+func (c *TimeHM) Scan(v interface{}) error {
+	parsed, err := time.Parse(TimeHMLayoutDB, v.(string))
+	if err != nil {
+		return err
+	}
+
+	c.Time = parsed
+
+	return nil
+}
+
+func (c TimeHM) Value() (driver.Value, error) {
+	return c.Time.Format(TimeHMLayout), nil
 }
