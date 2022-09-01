@@ -8,8 +8,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 
-	"git.esphere.local/SberbankTravel/hotels/core-tools.git/pkg/database"
-	"git.esphere.local/SberbankTravel/hotels/core-tools.git/pkg/elastic"
+	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
+	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/elastic"
 )
 
 type BaseRepoInterface interface {

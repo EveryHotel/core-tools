@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	sberIdentity "git.esphere.local/SberbankTravel/hotels/core-tools.git/pkg/sber-identity"
+	sberIdentity "git.esphere.local/SberbankTravel/hotels/core-tools/pkg/sber-identity"
 )
 
 const (

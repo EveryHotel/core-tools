@@ -7,7 +7,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 
-	"git.esphere.local/SberbankTravel/hotels/core-tools.git/pkg/database"
+	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
 )
 
 type BaseRepo[T any] interface {
