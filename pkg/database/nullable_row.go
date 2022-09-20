@@ -107,7 +107,7 @@ func TransformNullableToDest(fieldOrig reflect.Value, field any) reflect.Value {
 	case reflect.String:
 		fieldOrig.SetString((*(field.(*null.String))).String)
 	default:
-		if fieldOrig.Type().Name() == reflect.TypeOf(time.Time{}).Name() {
+		if fieldOrig.Type().String() == reflect.TypeOf(time.Time{}).String() {
 			fieldOrig = reflect.ValueOf((*(field.(*null.Time))).Time)
 		}
 	}
