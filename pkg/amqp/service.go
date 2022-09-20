@@ -114,7 +114,9 @@ func (s *amqpService) handleMessage(message rabbitmq.Delivery, consumer Consumer
 			}
 		}
 
-		task.GetFailedCallback()()
+		if task.GetFailedCallback() != nil {
+			task.GetFailedCallback()()
+		}
 		return rabbitmq.NackDiscard
 	}
 
