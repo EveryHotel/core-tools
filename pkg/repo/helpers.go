@@ -47,7 +47,10 @@ func SanitizeRows(entity interface{}, opts ...SanitizeRowsOption) (int64, map[st
 
 		if pkTag := tag.Get("primary"); pkTag != "" {
 			primary = vEntity.Field(i).Int()
-			continue
+			// если поле помечено как НЕ автоинкрементное, оставляем его в списке
+			if nsTag := tag.Get("not_serial"); nsTag == "" {
+				continue
+			}
 		}
 
 		if _, ok := handler.SkippingFields[dbFieldName]; !ok {
