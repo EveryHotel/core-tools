@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
+const CtxDbTxKey = "db_tx"
+
 type DBService interface {
 	Dialect() goqu.DialectWrapper
 	Exec(ctx context.Context, query string, args []any) error
@@ -17,7 +20,9 @@ type DBService interface {
 	Count(ctx context.Context, sql string, args []any) (int64, error)
 	SelectOne(ctx context.Context, sql string, args []any, dest any, relations ...string) error
 	Select(ctx context.Context, sql string, args []any, dest any, relations ...string) error
-	Begin(ctx context.Context) (pgx.Tx, error)
+	Begin(ctx context.Context) (context.Context, error)
+	Commit(ctx context.Context) error
+	Rollback(ctx context.Context) error
 	InsertMany(ctx context.Context, sql string, args []any, dest any) error
 }
 
@@ -38,22 +43,39 @@ func (s *dbService) Dialect() goqu.DialectWrapper {
 }
 
 // Exec выполняет запрос
-func (s *dbService) Exec(ctx context.Context, query string, args []any) error {
-	_, err := s.pool.Exec(ctx, query, args...)
+func (s *dbService) Exec(ctx context.Context, query string, args []any) (err error) {
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		_, err = tx.Exec(ctx, query, args...)
+	} else {
+		_, err = s.pool.Exec(ctx, query, args...)
+	}
 
 	return err
 }
 
 // Insert выполняет insert запрос и возвращает данные в dest
-func (s *dbService) Insert(ctx context.Context, sql string, args []any, dest any) error {
-	err := s.pool.QueryRow(ctx, sql, args...).Scan(dest)
+func (s *dbService) Insert(ctx context.Context, sql string, args []any, dest any) (err error) {
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		err = tx.QueryRow(ctx, sql, args...).Scan(dest)
+	} else {
+		err = s.pool.QueryRow(ctx, sql, args...).Scan(dest)
+	}
 
 	return err
 }
 
 // InsertMany выполняет insert запрос и возвращает множественные данные в dest
-func (s *dbService) InsertMany(ctx context.Context, sql string, args []any, dest any) error {
-	rows, err := s.pool.Query(ctx, sql, args...)
+func (s *dbService) InsertMany(ctx context.Context, sql string, args []any, dest any) (err error) {
+	var rows pgx.Rows
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		rows, err = tx.Query(ctx, sql, args...)
+	} else {
+		rows, err = s.pool.Query(ctx, sql, args...)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -66,8 +88,15 @@ func (s *dbService) InsertMany(ctx context.Context, sql string, args []any, dest
 }
 
 // Select выполняет SELECT запрос и сохраняет результаты в массив структур dest
-func (s *dbService) Select(ctx context.Context, sql string, args []any, dest any, relations ...string) error {
-	rows, err := s.pool.Query(ctx, sql, args...)
+func (s *dbService) Select(ctx context.Context, sql string, args []any, dest any, relations ...string) (err error) {
+	var rows pgx.Rows
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		rows, err = tx.Query(ctx, sql, args...)
+	} else {
+		rows, err = s.pool.Query(ctx, sql, args...)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -80,10 +109,16 @@ func (s *dbService) Select(ctx context.Context, sql string, args []any, dest any
 }
 
 // SelectOne выполняет SELECT запрос и сохраняет только первый результат в структуру dest
-func (s *dbService) SelectOne(ctx context.Context, sql string, args []any, dest any, relations ...string) error {
-	row := s.pool.QueryRow(ctx, sql, args...)
+func (s *dbService) SelectOne(ctx context.Context, sql string, args []any, dest any, relations ...string) (err error) {
+	var row pgx.Row
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		row = tx.QueryRow(ctx, sql, args...)
+	} else {
+		row = s.pool.QueryRow(ctx, sql, args...)
+	}
 
-	if err := scanRow(row, dest, relations...); err != nil {
+	if err = scanRow(row, dest, relations...); err != nil {
 		return err
 	}
 
@@ -91,20 +126,54 @@ func (s *dbService) SelectOne(ctx context.Context, sql string, args []any, dest 
 }
 
 // Count выполняет COUNT запрос
-func (s *dbService) Count(ctx context.Context, sql string, args []any) (int64, error) {
-	row := s.pool.QueryRow(ctx, sql, args...)
+func (s *dbService) Count(ctx context.Context, sql string, args []any) (count int64, err error) {
+	var row pgx.Row
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		row = tx.QueryRow(ctx, sql, args...)
+	} else {
+		row = s.pool.QueryRow(ctx, sql, args...)
+	}
 
-	var count int64
-	if err := row.Scan(&count); err != nil {
+	if err = row.Scan(&count); err != nil {
 		return count, err
 	}
 
 	return count, nil
 }
 
-// Begin Создает транзакцию
-func (s *dbService) Begin(ctx context.Context) (pgx.Tx, error) {
-	return s.pool.Begin(ctx)
+// Begin Создает транзакцию и возвращает связанный с нею контекст
+func (s *dbService) Begin(ctx context.Context) (context.Context, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ctx, err
+	}
+
+	ctx = context.WithValue(ctx, CtxDbTxKey, tx)
+
+	return ctx, nil
+}
+
+// Commit Применяет транзакцию
+func (s *dbService) Commit(ctx context.Context) error {
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit tx: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Rollback Откатывает транзакцию
+func (s *dbService) Rollback(ctx context.Context) error {
+	tx, ok := ctx.Value(CtxDbTxKey).(pgx.Tx)
+	if ok {
+		return tx.Rollback(ctx)
+	}
+
+	return nil
 }
 
 func scanRows(rows pgx.Rows, dest any, relations ...string) error {
