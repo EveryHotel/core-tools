@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/doug-martin/goqu/v9/exp"
 
 	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
 )
@@ -18,7 +19,7 @@ type BaseRepo[T any] interface {
 	GetOneBy(context.Context, map[string]interface{}) (T, error)
 	ForceDelete(context.Context, int64) error
 	List(context.Context) ([]T, error)
-	ListBy(context.Context, map[string]interface{}) ([]T, error)
+	ListBy(context.Context, map[string]interface{}, ...ListOption) ([]T, error)
 	SoftDelete(context.Context, int64) error
 	Update(context.Context, T) error
 }
@@ -35,6 +36,29 @@ func NewRepository[T any](db database.DBService, tableName, alias string) BaseRe
 		tableName: tableName,
 		alias:     alias,
 	}
+}
+
+type ListOption func(handler *ListOptionHandler)
+
+func WithLimit(limit int64) ListOption {
+	return func(handler *ListOptionHandler) {
+		handler.Limit = limit
+	}
+}
+
+func WithSort(sort []exp.OrderedExpression) ListOption {
+	return func(handler *ListOptionHandler) {
+		handler.Sort = sort
+	}
+}
+
+func NewListOptionHandler() *ListOptionHandler {
+	return &ListOptionHandler{}
+}
+
+type ListOptionHandler struct {
+	Limit int64
+	Sort  []exp.OrderedExpression
 }
 
 // BulkUpdate обновляет записи в таблице по заданному условию
@@ -170,14 +194,27 @@ func (r baseRepo[T]) List(ctx context.Context) ([]T, error) {
 }
 
 // ListBy возвращает список сущностей по критерию
-func (r baseRepo[T]) ListBy(ctx context.Context, criteria map[string]interface{}) ([]T, error) {
+func (r baseRepo[T]) ListBy(ctx context.Context, criteria map[string]interface{}, options ...ListOption) ([]T, error) {
 	var res []T
+
+	optHandler := NewListOptionHandler()
+	for _, opt := range options {
+		opt(optHandler)
+	}
 
 	ds := goqu.Select(database.Sanitize(*new(T), database.WithPrefix(r.alias))...).
 		From(database.GetTableName(r.tableName).As(r.alias))
 
 	if len(criteria) > 0 {
 		ds = ds.Where(goqu.Ex(criteria))
+	}
+
+	if len(optHandler.Sort) > 0 {
+		ds = ds.Order(optHandler.Sort...)
+	}
+
+	if optHandler.Limit > 0 {
+		ds = ds.Limit(uint(optHandler.Limit))
 	}
 
 	sql, args, err := ds.ToSQL()
