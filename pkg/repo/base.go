@@ -327,7 +327,7 @@ func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) erro
 	var records []interface{}
 	var columns []string
 	for _, entity := range entities {
-		id, rows := SanitizeRowsForUpdate(entity)
+		id, rows := SanitizeRowsForUpdateMultiple(entity)
 		if len(columns) == 0 {
 			for k := range rows {
 				columns = append(columns, k)

@@ -24,6 +24,15 @@ func SanitizeRowsForUpdate(entity interface{}) (int64, map[string]interface{}) {
 	return SanitizeRows(entity, opts...)
 }
 
+// SanitizeRowsForUpdateMultiple возвращает объект с полями для обновления сущности
+func SanitizeRowsForUpdateMultiple(entity interface{}) (int64, map[string]interface{}) {
+	opts := []SanitizeRowsOption{
+		WithDefaultTimestamps("updated_at"),
+	}
+
+	return SanitizeRows(entity, opts...)
+}
+
 type SanitizeRowsOption func(*sanitizeRowsHandler)
 
 // SanitizeRows возвращает объект с полями для добавления сущности
