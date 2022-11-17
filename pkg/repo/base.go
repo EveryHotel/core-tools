@@ -140,7 +140,7 @@ func (r baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
 func (r baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
 	var entity T
 
-	ds := goqu.Select(database.Sanitize(entity)...).
+	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
 		From(r.tableName).
 		Where(goqu.Ex{
 			"id": id,
@@ -163,7 +163,7 @@ func (r baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
 func (r baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]interface{}) (T, error) {
 	var entity T
 
-	ds := goqu.Select(database.Sanitize(entity)...).
+	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
 		From(r.tableName).
 		Where(goqu.Ex(conditions))
 

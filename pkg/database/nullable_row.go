@@ -18,9 +18,10 @@ func DestHasNullableRelations(vDest reflect.Value, relations ...string) bool {
 		field := vDest.Field(i)
 		tag := vDest.Type().Field(i).Tag
 
-		if field.Kind() == reflect.Struct {
+		if field.Kind() == reflect.Struct && tag.Get("relation") != "" {
+			relationsField := strings.Split(tag.Get("relation"), ",")
 			for _, relation := range relations {
-				if strings.Contains(tag.Get("relation"), relation) && strings.Contains(tag.Get("relation"), "nullable") {
+				if len(relationsField) > 0 && relation == relationsField[0] && isNullableField(relationsField) {
 					return true
 				}
 			}
@@ -66,9 +67,12 @@ func GetNullableRowFromOrigDest(vDest reflect.Value, nullable bool, relations ..
 			}
 		} else {
 			if field.Kind() == reflect.Struct && len(relations) > 0 {
-				for _, relation := range relations {
-					if tag.Get("relation") != "" && strings.Contains(tag.Get("relation"), relation) {
-						newItem = append(newItem, GetNullableRowFromOrigDest(field, strings.Contains(tag.Get("relation"), "nullable"))...)
+				if tag.Get("relation") != "" {
+					relationsField := strings.Split(tag.Get("relation"), ",")
+					for _, relation := range relations {
+						if len(relationsField) > 0 && relation == relationsField[0] {
+							newItem = append(newItem, GetNullableRowFromOrigDest(field, isNullableField(relationsField))...)
+						}
 					}
 				}
 			}
@@ -134,15 +138,34 @@ func SetDestFromNullable(vDestOrig reflect.Value, vDest []any, nullable bool, iD
 			}
 			iDest++
 		} else if fieldOrig.Kind() == reflect.Struct && len(relations) > 0 {
-			for _, relation := range relations {
-				if tag.Get("relation") != "" && strings.Contains(tag.Get("relation"), relation) {
-					setField, newIDest := SetDestFromNullable(fieldOrig, vDest, strings.Contains(tag.Get("relation"), "nullable"), iDest)
-					iDest = newIDest
-					fieldOrig.Set(setField)
+			if tag.Get("relation") != "" {
+				relationsField := strings.Split(tag.Get("relation"), ",")
+				for _, relation := range relations {
+					if len(relationsField) > 0 && relation == relationsField[0] {
+						setField, newIDest := SetDestFromNullable(fieldOrig, vDest, isNullableField(relationsField), iDest)
+						iDest = newIDest
+						fieldOrig.Set(setField)
+					}
 				}
 			}
 		}
 	}
 
 	return vDestOrig, iDest
+}
+
+func isNullableField(relationsField []string) bool {
+	count := 0
+	for _, relationField := range relationsField {
+		// первый relation игнорим, тк нужен параметр nullable
+		if count == 0 {
+			count++
+			continue
+		}
+		if relationField == "nullable" {
+			return true
+		}
+	}
+
+	return false
 }

@@ -3,19 +3,24 @@ package database
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 )
 
 type SanitizeOption func(*sanitizeOptionHandler)
 
 type sanitizeOptionHandler struct {
-	cols []interface{}
+	relationDests []any
+	relations     []string
+	cols          []any
 }
 
 // Sanitize возвращает список доступных DB полей у предоставленной структуры
-func Sanitize(dest interface{}, opts ...SanitizeOption) []interface{} {
+func Sanitize(dest any, opts ...SanitizeOption) []any {
 	vDest := reflect.ValueOf(dest)
-	var cols []interface{}
+	var cols []any
+	var relationDests []any
+	var relations []string
 
 	for i := 0; i < vDest.NumField(); i++ {
 		typeField := vDest.Type().Field(i)
@@ -24,9 +29,15 @@ func Sanitize(dest interface{}, opts ...SanitizeOption) []interface{} {
 		if tagVal := tag.Get("db"); tagVal != "" {
 			cols = append(cols, tagVal)
 		}
+
+		if tagVal := tag.Get("relation"); tagVal != "" {
+			relationsField := strings.Split(tag.Get("relation"), ",")
+			relationDests = append(relationDests, vDest.Field(i).Interface())
+			relations = append(relations, relationsField[0])
+		}
 	}
 
-	optHandler := newSanitizeOptionHandler(cols)
+	optHandler := newSanitizeOptionHandler(cols, relationDests, relations)
 	for _, opt := range opts {
 		opt(optHandler)
 	}
@@ -34,9 +45,11 @@ func Sanitize(dest interface{}, opts ...SanitizeOption) []interface{} {
 	return optHandler.GetCols()
 }
 
-func newSanitizeOptionHandler(cols []interface{}) *sanitizeOptionHandler {
+func newSanitizeOptionHandler(cols []any, relationDests []any, relations []string) *sanitizeOptionHandler {
 	return &sanitizeOptionHandler{
-		cols: cols,
+		relationDests: relationDests,
+		relations:     relations,
+		cols:          cols,
 	}
 }
 
@@ -47,6 +60,13 @@ func WithPrefix(p string) SanitizeOption {
 	}
 }
 
+// WithRelations возвращает опцию для задания связей для joins
+func WithRelations(r ...string) SanitizeOption {
+	return func(o *sanitizeOptionHandler) {
+		o.SetRelations(r...)
+	}
+}
+
 // ApplyPrefix применяет префикс ко всем полям
 func (o *sanitizeOptionHandler) ApplyPrefix(p string) {
 	for i, col := range o.cols {
@@ -54,13 +74,25 @@ func (o *sanitizeOptionHandler) ApplyPrefix(p string) {
 	}
 }
 
+// SetRelations ищет по префиксу всех связей в структуре
+func (o *sanitizeOptionHandler) SetRelations(rels ...string) {
+	for i, relation := range o.relations {
+		for _, rel := range rels {
+			if relation == rel {
+				o.cols = append(o.cols, Sanitize(o.relationDests[i], WithPrefix(rel))...)
+				break
+			}
+		}
+	}
+}
+
 // GetCols возвращает массив полей
-func (o sanitizeOptionHandler) GetCols() []interface{} {
+func (o sanitizeOptionHandler) GetCols() []any {
 	return o.cols
 }
 
 // SanitizeRowsForInsert возвращает объект с полями для добавления сущности
-func SanitizeRowsForInsert(entity interface{}) (int64, map[string]interface{}) {
+func SanitizeRowsForInsert(entity any) (int64, map[string]any) {
 	opts := []SanitizeRowsOption{
 		WithDefaultTimestamps("created_at", "updated_at"),
 	}
@@ -69,7 +101,7 @@ func SanitizeRowsForInsert(entity interface{}) (int64, map[string]interface{}) {
 }
 
 // SanitizeRowsForUpdate возвращает объект с полями для обновления сущности
-func SanitizeRowsForUpdate(entity interface{}) (int64, map[string]interface{}) {
+func SanitizeRowsForUpdate(entity any) (int64, map[string]any) {
 	opts := []SanitizeRowsOption{
 		WithSkippingFields("created_at"),
 		WithDefaultTimestamps("updated_at"),
@@ -81,7 +113,7 @@ func SanitizeRowsForUpdate(entity interface{}) (int64, map[string]interface{}) {
 type SanitizeRowsOption func(*sanitizeRowsHandler)
 
 // SanitizeRows возвращает объект с полями для добавления сущности
-func SanitizeRows(entity interface{}, opts ...SanitizeRowsOption) (int64, map[string]interface{}) {
+func SanitizeRows(entity any, opts ...SanitizeRowsOption) (int64, map[string]any) {
 	handler := &sanitizeRowsHandler{}
 	for _, opt := range opts {
 		opt(handler)
@@ -90,7 +122,7 @@ func SanitizeRows(entity interface{}, opts ...SanitizeRowsOption) (int64, map[st
 	vEntity := reflect.ValueOf(entity)
 
 	var primary int64
-	rows := map[string]interface{}{}
+	rows := map[string]any{}
 	for i := 0; i < vEntity.NumField(); i++ {
 		tag := vEntity.Type().Field(i).Tag
 
