@@ -141,7 +141,7 @@ func (r baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
 	var entity T
 
 	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
-		From(r.tableName).
+		From(database.GetTableName(r.tableName).As(r.alias)).
 		Where(goqu.Ex{
 			"id": id,
 		})
@@ -164,7 +164,7 @@ func (r baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]int
 	var entity T
 
 	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
-		From(r.tableName).
+		From(database.GetTableName(r.tableName).As(r.alias)).
 		Where(goqu.Ex(conditions))
 
 	sql, args, err := ds.ToSQL()
