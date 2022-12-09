@@ -64,17 +64,20 @@ func (s *s3Storage) Get(path string) (io.ReadCloser, error) {
 }
 
 func (s *s3Storage) GetUrl(file string) (string, error) {
-	endpoint := s.proxy
-	if endpoint == "" {
-		endpoint = s3.New(s.s3Session).Endpoint
+	if s.proxy == "" {
+		u, err := url.Parse(s3.New(s.s3Session).Endpoint)
+		if err != nil {
+			return "", err
+		}
+		u.Path = path.Join(s.bucket, file)
+		return u.String(), nil
 	}
-
-	u, err := url.Parse(endpoint)
+	u, err := url.Parse(s.proxy)
 	if err != nil {
 		return "", err
 	}
 
-	u.Path += path.Join(s.bucket, file)
+	u.Path = path.Join(u.Path, file)
 	return u.String(), nil
 }
 
