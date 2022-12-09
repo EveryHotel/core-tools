@@ -69,7 +69,7 @@ func (s *s3Storage) GetUrl(file string) (string, error) {
 		endpoint = s3.New(s.s3Session).Endpoint
 	}
 
-	u, err := url.Parse(s3.New(s.s3Session).Endpoint)
+	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", err
 	}
