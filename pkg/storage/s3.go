@@ -65,7 +65,7 @@ func (s *s3Storage) Get(path string) (io.ReadCloser, error) {
 
 func (s *s3Storage) GetUrl(file string) (string, error) {
 	endpoint := s.proxy
-	if endpoint != "" {
+	if endpoint == "" {
 		endpoint = s3.New(s.s3Session).Endpoint
 	}
 
