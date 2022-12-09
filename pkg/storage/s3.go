@@ -15,9 +15,10 @@ import (
 type s3Storage struct {
 	s3Session *session.Session
 	bucket    string
+	proxy     string
 }
 
-func NewS3Storage(endpoint string, region string, bucket string, accessId string, secretId string) StorageService {
+func NewS3Storage(endpoint string, region string, bucket string, accessId string, secretId string, proxy string) StorageService {
 	newSession := session.Must(session.NewSession(&aws.Config{
 		Credentials: credentials.NewStaticCredentials(accessId, secretId, ""),
 		Endpoint:    aws.String(endpoint),
@@ -27,6 +28,7 @@ func NewS3Storage(endpoint string, region string, bucket string, accessId string
 	return &s3Storage{
 		s3Session: newSession,
 		bucket:    bucket,
+		proxy:     proxy,
 	}
 }
 
@@ -62,11 +64,17 @@ func (s *s3Storage) Get(path string) (io.ReadCloser, error) {
 }
 
 func (s *s3Storage) GetUrl(file string) (string, error) {
+	endpoint := s.proxy
+	if endpoint != "" {
+		endpoint = s3.New(s.s3Session).Endpoint
+	}
+
 	u, err := url.Parse(s3.New(s.s3Session).Endpoint)
 	if err != nil {
 		return "", err
 	}
-	u.Path = path.Join(s.bucket, file)
+
+	u.Path += path.Join(s.bucket, file)
 	return u.String(), nil
 }
 
