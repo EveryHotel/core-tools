@@ -21,7 +21,7 @@ type BaseIndexInterface interface {
 	Get(documentId string) (SearchHit, error)
 	Delete(documentId string) error
 	Search(request esapi.SearchRequest) (SearchResponse, error)
-	SearchBy(term string, fields []string) (SearchResponse, error)
+	SearchBy(term string, fields []string, filters map[string]any) (SearchResponse, error)
 	BulkIndex(data map[string]interface{}) error
 	Recreate() error
 }
@@ -216,6 +216,7 @@ func (i *BaseIndex) Search(
 func (i *BaseIndex) SearchBy(
 	term string,
 	fields []string,
+	filters map[string]interface{},
 ) (SearchResponse, error) {
 
 	var (
@@ -232,12 +233,18 @@ func (i *BaseIndex) SearchBy(
 			},
 		})
 	}
+	boolQuery := map[string]interface{}{
+		"should": matches,
+	}
+	if len(filters) > 0 {
+		boolQuery["filter"] = map[string]interface{}{
+			"term": filters,
+		}
+	}
 
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-				"should": matches,
-			},
+			"bool": boolQuery,
 		},
 	}
 

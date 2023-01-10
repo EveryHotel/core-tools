@@ -15,7 +15,7 @@ type Index[T any] interface {
 type GenericIndex[I Index[T], T any] interface {
 	BaseIndexInterface
 	Update(T) error
-	SearchByName(term string) ([]I, error)
+	SearchByName(term string, filters map[string]any) ([]I, error)
 	GetValue(id int64) (I, error)
 }
 
@@ -62,10 +62,10 @@ func (i genericIndex[I, T]) Update(entity T) error {
 }
 
 // SearchByName поиск сущности в индексе по названию
-func (i genericIndex[I, T]) SearchByName(term string) ([]I, error) {
+func (i genericIndex[I, T]) SearchByName(term string, filters map[string]any) ([]I, error) {
 	var res []I
 
-	response, err := i.SearchBy(term, []string{"name_ru", "name_en"})
+	response, err := i.SearchBy(term, []string{"name_ru", "name_en"}, filters)
 	if err != nil {
 		return res, err
 	}
