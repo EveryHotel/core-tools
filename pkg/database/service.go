@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"reflect"
 	"strings"
@@ -235,6 +236,10 @@ func scanRow(row pgx.Row, dest any, relations ...string) error {
 }
 
 func setDestFields(vDest reflect.Value, scanFields []any, relations ...string) []any {
+	if vDest.Type().Kind() != reflect.Struct || vDest.Type().Implements(reflect.TypeOf((*driver.Valuer)(nil)).Elem()) {
+		scanFields = append(scanFields, vDest.Addr().Interface())
+		return scanFields
+	}
 
 	for i := 0; i < vDest.NumField(); i++ {
 		field := vDest.Field(i)
