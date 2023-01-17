@@ -2,7 +2,7 @@ package database
 
 import (
 	"context"
-	"database/sql/driver"
+	"database/sql"
 	"fmt"
 	"reflect"
 	"strings"
@@ -180,9 +180,11 @@ func (s *dbService) Rollback(ctx context.Context) error {
 func scanRows(rows pgx.Rows, dest any, relations ...string) error {
 	vDest := reflect.ValueOf(dest).Elem()
 
+	// определяем - является ли сущность с nullable сущностями для оптимизации обычных запросов
 	nullable := DestHasNullableRelations(reflect.New(reflect.TypeOf(dest).Elem().Elem()).Elem(), relations...)
 
 	var nullableRow, scanFields []any
+	// создаем nullableRow, куда будет происходить скан
 	if nullable {
 		nullableRow = GetNullableRowFromOrigDest(reflect.New(reflect.TypeOf(dest).Elem().Elem()).Elem(), false, relations...)
 		scanFields = SetNullableDestFields(reflect.ValueOf(nullableRow), []any{})
@@ -193,6 +195,7 @@ func scanRows(rows pgx.Rows, dest any, relations ...string) error {
 		// первый Elem() разыименовывает его, второй Elem() получает типо элемента в slice
 		destItem := reflect.New(reflect.TypeOf(dest).Elem().Elem()).Elem()
 
+		// если это сущность с nullable, то мы сначала сканируем,(тк мы до этого уже сделали scanFields) и потом проставляем заначения в сущность из nullableRow
 		if nullable {
 			if err := rows.Scan(scanFields...); err != nil {
 				return err
@@ -214,9 +217,11 @@ func scanRows(rows pgx.Rows, dest any, relations ...string) error {
 func scanRow(row pgx.Row, dest any, relations ...string) error {
 	vDest := reflect.ValueOf(dest).Elem()
 
+	// определяем - является ли сущность с nullable сущностями для оптимизации обычных запросов
 	nullable := DestHasNullableRelations(vDest, relations...)
 
 	if nullable {
+		// создаем nullableRow, куда будет происходить скан
 		nullableRow := GetNullableRowFromOrigDest(vDest, false, relations...)
 
 		scanFields := SetNullableDestFields(reflect.ValueOf(nullableRow), []any{})
@@ -224,6 +229,7 @@ func scanRow(row pgx.Row, dest any, relations ...string) error {
 			return err
 		}
 
+		//проставляем заначения в сущность из nullableRow
 		SetDestFromNullable(vDest, nullableRow, false, 0, relations...)
 	} else {
 		scanFields := setDestFields(vDest, []any{}, relations...)
@@ -236,7 +242,7 @@ func scanRow(row pgx.Row, dest any, relations ...string) error {
 }
 
 func setDestFields(vDest reflect.Value, scanFields []any, relations ...string) []any {
-	if vDest.Type().Kind() != reflect.Struct || vDest.Type().Implements(reflect.TypeOf((*driver.Valuer)(nil)).Elem()) {
+	if vDest.Type().Kind() != reflect.Struct || vDest.Type().Implements(reflect.TypeOf((*sql.Scanner)(nil)).Elem()) {
 		scanFields = append(scanFields, vDest.Addr().Interface())
 		return scanFields
 	}

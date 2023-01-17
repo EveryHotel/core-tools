@@ -18,7 +18,7 @@ func DestHasNullableRelations(vDest reflect.Value, relations ...string) bool {
 		field := vDest.Field(i)
 		tag := vDest.Type().Field(i).Tag
 
-		if field.Kind() == reflect.Struct && tag.Get("relation") != "" {
+		if (field.Kind() == reflect.Struct || field.Kind() == reflect.Pointer) && tag.Get("relation") != "" {
 			relationsField := strings.Split(tag.Get("relation"), ",")
 			for _, relation := range relations {
 				if len(relationsField) > 0 && relation == relationsField[0] && isNullableField(relationsField) {
@@ -32,6 +32,8 @@ func DestHasNullableRelations(vDest reflect.Value, relations ...string) bool {
 }
 
 // TransformDestToNullable переделываем изачальное поле с go типом в nullable тип
+//  ввод int64
+//  результат null.Int
 func TransformDestToNullable(field reflect.Value) any {
 	newField := reflect.New(field.Type()).Interface()
 
@@ -54,25 +56,56 @@ func TransformDestToNullable(field reflect.Value) any {
 }
 
 // GetNullableRowFromOrigDest получаем слайс интерфейсов с nullable полями в join сущностях
+// ввод
+//	Id      int64     `db:"id" primary:"1"`
+//	PhotoId null.Int  `db:"photo_id"`
+//	Photo   RoomPhoto `relation:"rp,nullable"`
+//
+//  результат
+// 	[
+//		1.Id      int64    `db:"id" primary:"1"`
+//		2.PhotoId null.Int `db:"photo_id"`
+//		3.[
+//			1.	Id            null.Int    `db:"id" primary:"1"`
+//			2.	DescriptionRu null.String `db:"description_ru"`
+//			3.	DescriptionEn null.String `db:"description_en"`
+//		]
+//  ]
 func GetNullableRowFromOrigDest(vDest reflect.Value, nullable bool, relations ...string) (newItem []any) {
 	for i := 0; i < vDest.NumField(); i++ {
 		field := vDest.Field(i)
 		tag := vDest.Type().Field(i).Tag
 
 		if tag.Get("db") != "" {
+			// если vDest - nullable, то переводим его поля в null тип(для рекурсивного вызова)
 			if !nullable {
 				newItem = append(newItem, reflect.New(field.Type()).Interface())
 			} else {
 				newItem = append(newItem, TransformDestToNullable(field))
 			}
 		} else {
-			if field.Kind() == reflect.Struct && len(relations) > 0 {
-				if tag.Get("relation") != "" {
-					relationsField := strings.Split(tag.Get("relation"), ",")
-					for _, relation := range relations {
-						if len(relationsField) > 0 && relation == relationsField[0] {
-							newItem = append(newItem, GetNullableRowFromOrigDest(field, isNullableField(relationsField))...)
-						}
+			// определяем что поле входит в массив передаваемых джоинов
+			if tag.Get("relation") != "" && len(relations) > 0 {
+				kind := field.Kind()
+				var fieldValue reflect.Value
+				// обрабатываем только 2 типа - указатель и структуру
+				// если структура - передаем нарямую Value
+				// если указатель - делаем новое Value
+				if kind == reflect.Struct || kind == reflect.Pointer {
+					if kind == reflect.Struct {
+						fieldValue = field
+					}
+
+					if kind == reflect.Pointer {
+						// создаем новое Value из типа указателя
+						fieldValue = reflect.New(field.Type().Elem()).Elem()
+					}
+				}
+
+				relationsField := strings.Split(tag.Get("relation"), ",")
+				for _, relation := range relations {
+					if len(relationsField) > 0 && relation == relationsField[0] {
+						newItem = append(newItem, GetNullableRowFromOrigDest(fieldValue, isNullableField(relationsField))...)
 					}
 				}
 			}
@@ -83,10 +116,29 @@ func GetNullableRowFromOrigDest(vDest reflect.Value, nullable bool, relations ..
 }
 
 // SetNullableDestFields сканируем слайс с nullable интерфейсами
+// ввод
+// 	[
+//		1.Id int64 `db:"id" primary:"1"`
+//		2.PhotoId null.Int `db:"photo_id"`
+//		3.[
+//			1.	Id            null.Int    `db:"id" primary:"1"`
+//			2.	DescriptionRu null.String `db:"description_ru"`
+//			3.	DescriptionEn null.String `db:"description_en"`
+//		]
+//  ]
+//  результат
+// 	[
+//		1.Id int64 `db:"id" primary:"1"`
+//		2.PhotoId null.Int `db:"photo_id"`
+//		3.Id null.Int `db:"id" primary:"1"`
+//		4.DescriptionRu null.String `db:"description_ru"`
+//		5.DescriptionEn null.String `db:"description_en"`
+//  ]
 func SetNullableDestFields(vDest reflect.Value, scanFields []any) []any {
 	for i := 0; i < vDest.Len(); i++ {
 		field := vDest.Index(i)
 
+		//
 		if field.Kind() == reflect.Slice {
 			scanFields = SetNullableDestFields(field, scanFields)
 		} else {
@@ -98,6 +150,8 @@ func SetNullableDestFields(vDest reflect.Value, scanFields []any) []any {
 }
 
 // TransformNullableToDest передаем значение из ранее переделанного nullable поля в изначальный тип
+//  ввод int64, null.Int
+//  результат int64
 func TransformNullableToDest(fieldOrig reflect.Value, field any) reflect.Value {
 	switch fieldOrig.Kind() {
 	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint:
@@ -120,6 +174,19 @@ func TransformNullableToDest(fieldOrig reflect.Value, field any) reflect.Value {
 }
 
 // SetDestFromNullable проставляем изначальной сущности поля из nullable слайса
+// ввод
+// 	[
+//		1.	Id      int64    `db:"id" primary:"1"`
+//		2.	PhotoId null.Int `db:"photo_id"`
+//		3.	Id            null.Int    `db:"id" primary:"1"`
+//		4.	DescriptionRu null.String `db:"description_ru"`
+//		5.	DescriptionEn null.String `db:"description_en"`
+//
+//  ]
+//  результат
+//	Id      int64     `db:"id" primary:"1"`
+//	PhotoId null.Int  `db:"photo_id"`
+//	Photo   RoomPhoto `relation:"rp,nullable"`
 func SetDestFromNullable(vDestOrig reflect.Value, vDest []any, nullable bool, iDest int, relations ...string) (reflect.Value, int) {
 	for i := 0; i < vDestOrig.NumField(); i++ {
 		fieldOrig := vDestOrig.Field(i)
@@ -137,14 +204,31 @@ func SetDestFromNullable(vDestOrig reflect.Value, vDest []any, nullable bool, iD
 				fieldOrig.Set(reflect.ValueOf(field).Elem())
 			}
 			iDest++
-		} else if fieldOrig.Kind() == reflect.Struct && len(relations) > 0 {
-			if tag.Get("relation") != "" {
+		} else if tag.Get("relation") != "" && len(relations) > 0 {
+			kind := fieldOrig.Kind()
+			var fieldValue reflect.Value
+			if kind == reflect.Struct || kind == reflect.Pointer {
+				if kind == reflect.Struct {
+					fieldValue = fieldOrig
+				}
+
+				if kind == reflect.Pointer {
+					// создаем новое Value из типа указателя
+					fieldValue = reflect.New(fieldOrig.Type().Elem()).Elem()
+				}
+
 				relationsField := strings.Split(tag.Get("relation"), ",")
 				for _, relation := range relations {
 					if len(relationsField) > 0 && relation == relationsField[0] {
-						setField, newIDest := SetDestFromNullable(fieldOrig, vDest, isNullableField(relationsField), iDest)
+						setField, newIDest := SetDestFromNullable(fieldValue, vDest, isNullableField(relationsField), iDest)
 						iDest = newIDest
-						fieldOrig.Set(setField)
+
+						if kind == reflect.Pointer {
+							// проставляем для указателя, указатель из Value
+							fieldOrig.Set(setField.Addr())
+						} else {
+							fieldOrig.Set(setField)
+						}
 					}
 				}
 			}

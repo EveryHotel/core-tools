@@ -32,7 +32,16 @@ func Sanitize(dest any, opts ...SanitizeOption) []any {
 
 		if tagVal := tag.Get("relation"); tagVal != "" {
 			relationsField := strings.Split(tag.Get("relation"), ",")
-			relationDests = append(relationDests, vDest.Field(i).Interface())
+			var vDestI any
+			kind := vDest.Field(i).Kind()
+
+			if kind == reflect.Pointer {
+				//создаем новый интерфейс из типа указателя
+				vDestI = reflect.New(vDest.Field(i).Type().Elem()).Elem().Interface()
+			} else {
+				vDestI = vDest.Field(i).Interface()
+			}
+			relationDests = append(relationDests, vDestI)
 			relations = append(relations, relationsField[0])
 		}
 	}
