@@ -31,12 +31,13 @@ func NewIndexableRepository[E any, I elastic.Index[E], ID int64 | string](
 	index elastic.GenericIndex[I, E],
 	tableName string,
 	alias string,
+	idColumn string,
 	setId func(ptr *E, id ID),
 	needUpdateIndex func(entity E) bool,
 ) IndexableBaseRepo[E, I, ID] {
 
 	return &indexableBaseRepo[E, I, ID]{
-		BaseRepo:        NewRepository[E, ID](db, tableName, alias),
+		BaseRepo:        NewRepository[E, ID](db, tableName, alias, idColumn),
 		Index:           index,
 		db:              db,
 		tableName:       tableName,
