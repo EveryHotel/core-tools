@@ -6,37 +6,37 @@ import (
 )
 
 // SanitizeRowsForInsert возвращает объект с полями для добавления сущности
-func SanitizeRowsForInsert(entity interface{}) (int64, map[string]interface{}) {
+func SanitizeRowsForInsert[ID int64 | string](entity interface{}) (ID, map[string]interface{}) {
 	opts := []SanitizeRowsOption{
 		WithDefaultTimestamps("created_at", "updated_at"),
 	}
 
-	return SanitizeRows(entity, opts...)
+	return SanitizeRows[ID](entity, opts...)
 }
 
 // SanitizeRowsForUpdate возвращает объект с полями для обновления сущности
-func SanitizeRowsForUpdate(entity interface{}) (int64, map[string]interface{}) {
+func SanitizeRowsForUpdate[ID int64 | string](entity interface{}) (ID, map[string]interface{}) {
 	opts := []SanitizeRowsOption{
 		WithSkippingFields("created_at"),
 		WithDefaultTimestamps("updated_at"),
 	}
 
-	return SanitizeRows(entity, opts...)
+	return SanitizeRows[ID](entity, opts...)
 }
 
 // SanitizeRowsForUpdateMultiple возвращает объект с полями для обновления сущности
-func SanitizeRowsForUpdateMultiple(entity interface{}) (int64, map[string]interface{}) {
+func SanitizeRowsForUpdateMultiple[ID int64 | string](entity interface{}) (ID, map[string]interface{}) {
 	opts := []SanitizeRowsOption{
 		WithDefaultTimestamps("updated_at"),
 	}
 
-	return SanitizeRows(entity, opts...)
+	return SanitizeRows[ID](entity, opts...)
 }
 
 type SanitizeRowsOption func(*sanitizeRowsHandler)
 
 // SanitizeRows возвращает объект с полями для добавления сущности
-func SanitizeRows(entity interface{}, opts ...SanitizeRowsOption) (int64, map[string]interface{}) {
+func SanitizeRows[ID int64 | string](entity interface{}, opts ...SanitizeRowsOption) (ID, map[string]interface{}) {
 	handler := &sanitizeRowsHandler{}
 	for _, opt := range opts {
 		opt(handler)
@@ -44,7 +44,7 @@ func SanitizeRows(entity interface{}, opts ...SanitizeRowsOption) (int64, map[st
 
 	vEntity := reflect.ValueOf(entity)
 
-	var primary int64
+	var primary ID
 	rows := map[string]interface{}{}
 	for i := 0; i < vEntity.NumField(); i++ {
 		tag := vEntity.Type().Field(i).Tag
@@ -55,7 +55,8 @@ func SanitizeRows(entity interface{}, opts ...SanitizeRowsOption) (int64, map[st
 		}
 
 		if pkTag := tag.Get("primary"); pkTag != "" {
-			primary = vEntity.Field(i).Int()
+			reflect.TypeOf(primary)
+			primary = vEntity.Field(i).Interface().(ID)
 			// если поле помечено как НЕ автоинкрементное, оставляем его в списке
 			if nsTag := tag.Get("not_serial"); nsTag == "" {
 				continue

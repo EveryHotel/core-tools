@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
+
+	"github.com/jonboulle/clockwork"
 )
 
 type SanitizeOption func(*sanitizeOptionHandler)
@@ -101,28 +102,28 @@ func (o sanitizeOptionHandler) GetCols() []any {
 }
 
 // SanitizeRowsForInsert возвращает объект с полями для добавления сущности
-func SanitizeRowsForInsert(entity any) (int64, map[string]any) {
+func SanitizeRowsForInsert(entity interface{}, clock clockwork.Clock) (int64, map[string]any) {
 	opts := []SanitizeRowsOption{
 		WithDefaultTimestamps("created_at", "updated_at"),
 	}
 
-	return SanitizeRows(entity, opts...)
+	return SanitizeRows(entity, clock, opts...)
 }
 
 // SanitizeRowsForUpdate возвращает объект с полями для обновления сущности
-func SanitizeRowsForUpdate(entity any) (int64, map[string]any) {
+func SanitizeRowsForUpdate(entity any, clock clockwork.Clock) (int64, map[string]any) {
 	opts := []SanitizeRowsOption{
 		WithSkippingFields("created_at"),
 		WithDefaultTimestamps("updated_at"),
 	}
 
-	return SanitizeRows(entity, opts...)
+	return SanitizeRows(entity, clock, opts...)
 }
 
 type SanitizeRowsOption func(*sanitizeRowsHandler)
 
 // SanitizeRows возвращает объект с полями для добавления сущности
-func SanitizeRows(entity any, opts ...SanitizeRowsOption) (int64, map[string]any) {
+func SanitizeRows(entity any, clock clockwork.Clock, opts ...SanitizeRowsOption) (int64, map[string]any) {
 	handler := &sanitizeRowsHandler{}
 	for _, opt := range opts {
 		opt(handler)
@@ -149,7 +150,7 @@ func SanitizeRows(entity any, opts ...SanitizeRowsOption) (int64, map[string]any
 
 	for _, tsField := range handler.DefaultTimestamps {
 		if _, ok := rows[tsField]; ok {
-			rows[tsField] = time.Now()
+			rows[tsField] = clock.Now()
 		}
 	}
 

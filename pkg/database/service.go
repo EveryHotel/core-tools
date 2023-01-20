@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/driftprogramming/pgxpoolmock"
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 const CtxDbTxKey = "db_tx"
@@ -28,11 +28,11 @@ type DBService interface {
 }
 
 type dbService struct {
-	pool *pgxpool.Pool
+	pool pgxpoolmock.PgxPool
 }
 
 // NewDBService возвращает новый экзмпляр сервиса БД
-func NewDBService(pool *pgxpool.Pool) DBService {
+func NewDBService(pool pgxpoolmock.PgxPool) DBService {
 	return &dbService{
 		pool: pool,
 	}

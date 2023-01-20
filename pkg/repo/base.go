@@ -98,7 +98,7 @@ func (r baseRepo[T, ID]) BulkUpdate(ctx context.Context, updateFields, where map
 
 // Create создает новую сущность
 func (r baseRepo[T, ID]) Create(ctx context.Context, entity T) (ID, error) {
-	_, rows := SanitizeRowsForInsert(entity)
+	_, rows := SanitizeRowsForInsert[ID](entity)
 
 	ds := goqu.Insert(r.tableName).
 		Returning(goqu.C(r.idColumn)).
@@ -129,7 +129,7 @@ func (r baseRepo[T, ID]) Create(ctx context.Context, entity T) (ID, error) {
 
 // Update обновляет сущность
 func (r baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
-	id, rows := SanitizeRowsForUpdate(entity)
+	id, rows := SanitizeRowsForUpdate[ID](entity)
 
 	ds := goqu.Update(r.tableName).
 		Where(goqu.C(r.idColumn).Eq(id)).
@@ -363,7 +363,7 @@ func (r baseRepo[T, ID]) CreateMultiple(ctx context.Context, entities []T) ([]ID
 
 	var records []interface{}
 	for _, entity := range entities {
-		_, rows := SanitizeRowsForInsert(entity)
+		_, rows := SanitizeRowsForInsert[ID](entity)
 		records = append(records, rows)
 	}
 	ds := goqu.Insert(r.tableName).
@@ -397,7 +397,7 @@ func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) erro
 	var records []interface{}
 	var columns []string
 	for _, entity := range entities {
-		id, rows := SanitizeRowsForUpdateMultiple(entity)
+		id, rows := SanitizeRowsForUpdateMultiple[ID](entity)
 		if len(columns) == 0 {
 			for k := range rows {
 				columns = append(columns, k)
