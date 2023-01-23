@@ -2,9 +2,9 @@ package repo
 
 import (
 	"context"
-	"log"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/sirupsen/logrus"
 
 	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
 	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/elastic"
@@ -58,7 +58,10 @@ func (r *indexableBaseRepo[E, I, ID]) Create(ctx context.Context, entity E) (ID,
 
 	err = r.Index.Update(entity)
 	if err != nil {
-		log.Println("msg", "cannot create entity search index", "err", err)
+		logrus.WithFields(logrus.Fields{
+			"table": r.tableName,
+			"id":    id,
+		}).Error("cannot create entity search index ", err)
 	}
 
 	return id, nil
@@ -73,7 +76,10 @@ func (r *indexableBaseRepo[E, I, ID]) Update(ctx context.Context, entity E) erro
 	if r.needUpdateIndex(entity) {
 		err := r.Index.Update(entity)
 		if err != nil {
-			log.Println("msg", "cannot update entity search index", "err", err)
+			logrus.WithFields(logrus.Fields{
+				"table":  r.tableName,
+				"entity": entity,
+			}).Error("cannot update entity search index ", err)
 		}
 	}
 
@@ -84,7 +90,10 @@ func (r *indexableBaseRepo[E, I, ID]) Update(ctx context.Context, entity E) erro
 func (r *indexableBaseRepo[E, I, ID]) UpdateIndex(entity E) error {
 	err := r.Index.Update(entity)
 	if err != nil {
-		log.Println("msg", "cannot update entity search index", "err", err)
+		logrus.WithFields(logrus.Fields{
+			"table":  r.tableName,
+			"entity": entity,
+		}).Error("cannot update entity search index ", err)
 	}
 	return nil
 }

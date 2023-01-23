@@ -2,10 +2,11 @@ package elastic
 
 import (
 	"encoding/json"
-	"log"
+	"reflect"
 	"strconv"
 
 	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/sirupsen/logrus"
 )
 
 type Index[T any] interface {
@@ -41,7 +42,12 @@ func (i genericIndex[I, T]) GetValue(id int64) (I, error) {
 
 	bytes, err1 := json.Marshal(item.Source)
 	if err2 := json.Unmarshal(bytes, &idx); err1 != nil || err2 != nil {
-		log.Println("msg", "cannot convert entity search item", "err", err1, err2)
+		logrus.WithFields(logrus.Fields{
+			"marshal":   err1,
+			"unmarshal": err2,
+			"index":     reflect.TypeOf(item).Name(),
+			"id":        id,
+		}).Warn("cannot convert entity search item")
 	}
 	return idx, nil
 }
@@ -74,7 +80,12 @@ func (i genericIndex[I, T]) SearchByName(term string, filters map[string]any) ([
 		item := *new(I)
 		bytes, err1 := json.Marshal(hit.Source)
 		if err2 := json.Unmarshal(bytes, &item); err1 != nil || err2 != nil {
-			log.Println("msg", "cannot convert entity search item", "err", err1, err2)
+			logrus.WithFields(logrus.Fields{
+				"marshal":   err1,
+				"unmarshal": err2,
+				"index":     reflect.TypeOf(item).Name(),
+				"term":      term,
+			}).Warn("cannot convert entity search item")
 		}
 		res = append(res, item)
 	}

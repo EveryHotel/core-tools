@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/guregu/null v4.0.0+incompatible
 	github.com/jackc/pgx/v4 v4.14.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/wagslane/go-rabbitmq v0.8.1
 	github.com/xhit/go-simple-mail/v2 v2.11.0
 )
@@ -28,5 +29,6 @@ require (
 	github.com/rabbitmq/amqp091-go v1.3.0 // indirect
 	github.com/toorop/go-dkim v0.0.0-20201103131630-e1cd1a0a5208 // indirect
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
+	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
 	golang.org/x/text v0.3.7 // indirect
 )

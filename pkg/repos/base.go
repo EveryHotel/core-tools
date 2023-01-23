@@ -2,11 +2,11 @@ package repos
 
 import (
 	"context"
-	"log"
 	"strconv"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
+	logrus "github.com/sirupsen/logrus"
 
 	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
 	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/elastic"
@@ -40,20 +40,29 @@ func (r BaseRepo) Delete(ctx context.Context, id int64) error {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		log.Println("msg", "cannot build SQL query", "err", err)
+		logrus.WithFields(logrus.Fields{
+			"table": r.TableName,
+			"id":    id,
+		}).Error("Cannot build sql query for delete", err)
 		return err
 	}
 
 	err = r.DB.Exec(ctx, sql, args)
 	if err != nil {
-		log.Println("msg", "cannot Exec delete sql", "err", err)
+		logrus.WithFields(logrus.Fields{
+			"table": r.TableName,
+			"id":    id,
+		}).Error("Cannot exec delete", err)
 		return err
 	}
 
 	if r.Index != nil {
 		err = r.Index.Delete(strconv.Itoa(int(id)))
 		if err != nil {
-			log.Println("msg", "cannot delete search index", "err", err)
+			logrus.WithFields(logrus.Fields{
+				"table": r.TableName,
+				"id":    id,
+			}).Error("Cannot delete search index", err)
 		}
 	}
 
@@ -71,13 +80,21 @@ func (r BaseRepo) BulkUpdate(ctx context.Context, updateFields, where map[string
 	sql, args, err := ds.ToSQL()
 
 	if err != nil {
-		log.Println("msg", "cannot build SQL query", "err", err)
+		logrus.WithFields(logrus.Fields{
+			"table":  r.TableName,
+			"update": updateFields,
+			"where":  where,
+		}).Error("Cannot build sql query for bulk update", err)
 		return err
 	}
 
 	err = r.DB.Exec(ctx, sql, args)
 	if err != nil {
-		log.Println("msg", "cannot Exec bulk update city sql", "err", err)
+		logrus.WithFields(logrus.Fields{
+			"table":  r.TableName,
+			"update": updateFields,
+			"where":  where,
+		}).Error("Cannot exec bulk update", err)
 		return err
 	}
 

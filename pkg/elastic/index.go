@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"reflect"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/elastic/go-elasticsearch/v7/esutil"
+	"github.com/sirupsen/logrus"
 )
 
 type BaseIndexInterface interface {
@@ -307,9 +308,13 @@ func (i *BaseIndex) BulkIndex(data map[string]interface{}) error {
 				},
 				OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 					if err != nil {
-						log.Printf("ERROR: %s", err)
+						logrus.WithFields(logrus.Fields{
+							"index": reflect.TypeOf(v).Name(),
+						}).Warn(err)
 					} else {
-						log.Printf("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
+						logrus.WithFields(logrus.Fields{
+							"index": reflect.TypeOf(v).Name(),
+						}).Errorf("%s: %s", res.Error.Type, res.Error.Reason)
 					}
 				},
 			},
@@ -327,22 +332,24 @@ func (i *BaseIndex) BulkIndex(data map[string]interface{}) error {
 	dur := time.Since(start)
 
 	if biStats.NumFailed > 0 {
-		log.Printf(
-			"Indexed [%s] documents with [%s] errors in %s (%s docs/sec) [%s]",
-			strconv.Itoa(int(biStats.NumFlushed)),
-			strconv.Itoa(int(biStats.NumFailed)),
-			dur.Truncate(time.Millisecond),
-			strconv.Itoa(int(1000.0/float64(dur/time.Millisecond)*float64(biStats.NumFlushed))),
-			i.indexName(),
-		)
+		logrus.WithFields(logrus.Fields{
+			"index": i.indexName(),
+		}).
+			Infof("Indexed [%s] documents with [%s] errors in %s (%s docs/sec)",
+				strconv.Itoa(int(biStats.NumFlushed)),
+				strconv.Itoa(int(biStats.NumFailed)),
+				dur.Truncate(time.Millisecond),
+				strconv.Itoa(int(1000.0/float64(dur/time.Millisecond)*float64(biStats.NumFlushed))),
+			)
 	} else {
-		log.Printf(
-			"Sucessfuly indexed [%s] documents in %s (%s docs/sec) [%s]",
-			strconv.Itoa(int(biStats.NumFlushed)),
-			dur.Truncate(time.Millisecond),
-			strconv.Itoa(int(1000.0/float64(dur/time.Millisecond)*float64(biStats.NumFlushed))),
-			i.indexName(),
-		)
+		logrus.WithFields(logrus.Fields{
+			"index": i.indexName(),
+		}).
+			Infof("Sucessfuly indexed [%s] documents in %s (%s docs/sec)",
+				strconv.Itoa(int(biStats.NumFlushed)),
+				dur.Truncate(time.Millisecond),
+				strconv.Itoa(int(1000.0/float64(dur/time.Millisecond)*float64(biStats.NumFlushed))),
+			)
 	}
 
 	return nil
