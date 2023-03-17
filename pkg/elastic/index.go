@@ -71,7 +71,7 @@ var (
 					},
 					"russian_stemmer": map[string]interface{}{
 						"type":     "stemmer",
-						"language": "russian",
+						"language": "light_russian",
 					},
 					"english_stop": map[string]interface{}{
 						"type":      "stop",
@@ -95,6 +95,33 @@ var (
 							"russian_stemmer",
 							"english_stop",
 							"english_stemmer",
+							"autocomplete_filter",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	SimpleAutocompleteIndexConfig = map[string]interface{}{
+		"settings": map[string]interface{}{
+			"analysis": map[string]interface{}{
+				"filter": map[string]interface{}{
+					"autocomplete_filter": map[string]interface{}{
+						"type":     "edge_ngram",
+						"min_gram": 2,
+						"max_gram": 20,
+					},
+				},
+				"analyzer": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":      "custom",
+						"tokenizer": "standard",
+						"char_filter": []string{
+							"html_strip",
+						},
+						"filter": []string{
+							"lowercase",
 							"autocomplete_filter",
 						},
 					},

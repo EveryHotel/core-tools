@@ -20,9 +20,15 @@ type GenericIndex[I Index[T], T any] interface {
 	GetValue(id int64) (I, error)
 }
 
-func NewIndex[I Index[T], T any](client *elasticsearch.Client, transform func(T) (I, error), alias, version string) GenericIndex[I, T] {
+func NewIndex[I Index[T], T any](client *elasticsearch.Client, transform func(T) (I, error), alias, version string, withStemmer bool) GenericIndex[I, T] {
+	var config map[string]interface{}
+	if withStemmer {
+		config = AutocompleteIndexConfig
+	} else {
+		config = SimpleAutocompleteIndexConfig
+	}
 	return &genericIndex[I, T]{
-		BaseIndex: *NewBaseIndex(client, alias, version, AutocompleteIndexConfig),
+		BaseIndex: *NewBaseIndex(client, alias, version, config),
 		transform: transform,
 	}
 }
