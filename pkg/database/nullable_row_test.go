@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
+	"github.com/EveryHotel/core-tools/pkg/database"
 )
 
 var _ = Describe("NullableRow", func() {

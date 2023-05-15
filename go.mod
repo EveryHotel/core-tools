@@ -1,4 +1,4 @@
-module git.esphere.local/SberbankTravel/hotels/core-tools
+module github.com/EveryHotel/core-tools
 
 go 1.18
 

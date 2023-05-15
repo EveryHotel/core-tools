@@ -8,8 +8,8 @@ import (
 	"github.com/doug-martin/goqu/v9"
 	logrus "github.com/sirupsen/logrus"
 
-	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
-	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/elastic"
+	"github.com/EveryHotel/core-tools/pkg/database"
+	"github.com/EveryHotel/core-tools/pkg/elastic"
 )
 
 type BaseRepoInterface interface {

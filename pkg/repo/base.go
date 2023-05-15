@@ -8,7 +8,7 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/sirupsen/logrus"
 
-	"git.esphere.local/SberbankTravel/hotels/core-tools/pkg/database"
+	"github.com/EveryHotel/core-tools/pkg/database"
 )
 
 type BaseRepo[T any, ID int64 | string] interface {

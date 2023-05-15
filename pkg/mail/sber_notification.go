@@ -12,7 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	sberIdentity "git.esphere.local/SberbankTravel/hotels/core-tools/pkg/sber-identity"
+	sberIdentity "github.com/EveryHotel/core-tools/pkg/sber-identity"
 )
 
 const (
