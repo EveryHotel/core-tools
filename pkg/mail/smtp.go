@@ -5,23 +5,16 @@ import (
 )
 
 type smtpMailService struct {
-	user     string
-	password string
-	host     string
-	port     int
-	from     string
+	clientConfig *mail.SMTPServer
 }
 
-func NewSmtpMailService(user string, pass string, host string, port int) MailService {
+func NewSmtpMailService(clientConfig *mail.SMTPServer) MailService {
 	return &smtpMailService{
-		user:     user,
-		password: pass,
-		host:     host,
-		port:     port,
+		clientConfig: clientConfig,
 	}
 }
 
-// Send отправляет письмо через смтп сервер
+// Send отправляет письмо через smtp сервер
 func (s *smtpMailService) Send(email EmailMessage) error {
 	msg := mail.NewMSG()
 	msg.SetFrom(email.From.String()).
@@ -56,23 +49,10 @@ func (s *smtpMailService) Send(email EmailMessage) error {
 		break
 	}
 
-	server := mail.NewSMTPClient()
-
-	server.Host = s.host
-	server.Port = s.port
-	server.Username = s.user
-	server.Password = s.password
-
-	server.Authentication = mail.AuthPlain
-
-	client, err := server.Connect()
+	client, err := s.clientConfig.Connect()
 
 	if err != nil {
-		server.Authentication = mail.AuthNone
-		client, err = server.Connect()
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	return msg.Send(client)
