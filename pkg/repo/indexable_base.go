@@ -20,6 +20,7 @@ type IndexableModel[I any] interface {
 type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface {
 	BaseRepo[E, ID]
 	Reindex(ctx context.Context) error
+	SearchByTerm(string) ([]I, error)
 	UpdateIndex(entity E) error
 }
 
