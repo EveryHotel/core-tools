@@ -53,6 +53,12 @@ func WithLimit(limit int64) ListOption {
 	}
 }
 
+func WithOffset(offset int64) ListOption {
+	return func(handler *ListOptionHandler) {
+		handler.Offset = offset
+	}
+}
+
 func WithSort(sort []exp.OrderedExpression) ListOption {
 	return func(handler *ListOptionHandler) {
 		handler.Sort = sort
@@ -64,8 +70,9 @@ func NewListOptionHandler() *ListOptionHandler {
 }
 
 type ListOptionHandler struct {
-	Limit int64
-	Sort  []exp.OrderedExpression
+	Limit  int64
+	Offset int64
+	Sort   []exp.OrderedExpression
 }
 
 // BulkUpdate обновляет записи в таблице по заданному условию
@@ -265,6 +272,10 @@ func (r baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interfa
 
 	if optHandler.Limit > 0 {
 		ds = ds.Limit(uint(optHandler.Limit))
+	}
+
+	if optHandler.Offset > 0 {
+		ds = ds.Offset(uint(optHandler.Offset))
 	}
 
 	sql, args, err := ds.ToSQL()

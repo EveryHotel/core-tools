@@ -4,146 +4,122 @@ import (
 	"context"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/sirupsen/logrus"
 
 	"github.com/EveryHotel/core-tools/pkg/database"
-	"github.com/EveryHotel/core-tools/pkg/elastic"
+	"github.com/EveryHotel/core-tools/pkg/meilisearch"
 )
 
-type IndexableBaseRepo[E any, I elastic.Index[E], ID int64 | string] interface {
+type IndexableModel interface {
+	GetModelIndex() any
+	IsDeleted() bool
+}
+
+type IndexableBaseRepo[E IndexableModel, ID int64 | string] interface {
 	BaseRepo[E, ID]
 	Reindex(ctx context.Context) error
 	UpdateIndex(entity E) error
 }
 
-type indexableBaseRepo[E any, I elastic.Index[E], ID int64 | string] struct {
+type indexableBaseRepo[E IndexableModel, ID int64 | string] struct {
 	BaseRepo[E, ID]
-	db              database.DBService
-	Index           elastic.GenericIndex[I, E]
-	tableName       string
-	alias           string
-	setId           func(ptr *E, id ID)
-	needUpdateIndex func(entity E) bool
+	meili     meilisearch.MeiliService
+	indexName string
+	alias     string
+	setId     func(ptr *E, id ID)
 }
 
-func NewIndexableRepository[E any, I elastic.Index[E], ID int64 | string](
+func NewIndexableRepository[E IndexableModel, ID int64 | string](
 	db database.DBService,
-	index elastic.GenericIndex[I, E],
-	tableName string,
-	alias string,
-	idColumn string,
+	meili meilisearch.MeiliService,
+	indexName, tableName, alias, idColumn string,
 	setId func(ptr *E, id ID),
-	needUpdateIndex func(entity E) bool,
-) IndexableBaseRepo[E, I, ID] {
-
-	return &indexableBaseRepo[E, I, ID]{
-		BaseRepo:        NewRepository[E, ID](db, tableName, alias, idColumn),
-		Index:           index,
-		db:              db,
-		tableName:       tableName,
-		alias:           alias,
-		setId:           setId,
-		needUpdateIndex: needUpdateIndex,
+) IndexableBaseRepo[E, ID] {
+	return &indexableBaseRepo[E, ID]{
+		BaseRepo:  NewRepository[E, ID](db, tableName, alias, idColumn),
+		meili:     meili,
+		indexName: indexName,
+		alias:     alias,
+		setId:     setId,
 	}
 }
 
 // Create Создает новую сущность
-func (r *indexableBaseRepo[E, I, ID]) Create(ctx context.Context, entity E) (ID, error) {
+func (r *indexableBaseRepo[E, ID]) Create(ctx context.Context, entity E) (ID, error) {
 	id, err := r.BaseRepo.Create(ctx, entity)
 	if err != nil {
 		return id, err
 	}
 
 	r.setId(&entity, id)
-
-	err = r.Index.Update(entity)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"table": r.tableName,
-			"id":    id,
-		}).Error("cannot create entity search index ", err)
-	}
+	_ = r.UpdateIndex(entity)
 
 	return id, nil
 }
 
 // Update Обновляет сущность
-func (r *indexableBaseRepo[E, I, ID]) Update(ctx context.Context, entity E) error {
+func (r *indexableBaseRepo[E, ID]) Update(ctx context.Context, entity E) error {
 	if err := r.BaseRepo.Update(ctx, entity); err != nil {
 		return err
 	}
 
-	if r.needUpdateIndex(entity) {
-		err := r.Index.Update(entity)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"table":  r.tableName,
-				"entity": entity,
-			}).Error("cannot update entity search index ", err)
-		}
-	}
+	_ = r.UpdateIndex(entity)
 
 	return nil
 }
 
 // UpdateIndex обновляет индекс сущности
-func (r *indexableBaseRepo[E, I, ID]) UpdateIndex(entity E) error {
-	err := r.Index.Update(entity)
-	if err != nil {
+func (r *indexableBaseRepo[E, ID]) UpdateIndex(entity E) error {
+	if entity.IsDeleted() {
+		return nil
+	}
+
+	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex()); err != nil {
 		logrus.WithFields(logrus.Fields{
-			"table":  r.tableName,
+			"index":  r.indexName,
 			"entity": entity,
 		}).Error("cannot update entity search index ", err)
 	}
+
 	return nil
 }
 
 // Reindex переиндексация всех сущностей
-func (r *indexableBaseRepo[E, I, ID]) Reindex(ctx context.Context) error {
-
+func (r *indexableBaseRepo[E, ID]) Reindex(ctx context.Context) error {
 	var (
 		err           error
-		limit, offset uint
-		sql           string
-		index         I
+		limit, offset int64
 	)
 
-	err = r.Index.Recreate()
+	err = r.meili.Clear(r.indexName)
 	if err != nil {
 		return err
 	}
 
-	ds := goqu.Select(database.Sanitize(index, database.WithPrefix(r.alias))...).
-		From(database.GetTableName(r.tableName).As(r.alias)).
-		Where(goqu.Ex{r.alias + ".deleted_at": nil}).
-		Order(goqu.I(r.alias + ".id").Asc())
-
 	limit = 500
 	offset = 0
+	criteria := map[string]any{
+		r.alias + ".deleted_at": nil,
+	}
+	sortRule := WithSort([]exp.OrderedExpression{goqu.I(r.alias + ".id").Asc()})
 
 	for {
-		var res []I
-
-		sql, _, err = ds.Limit(limit).Offset(offset).ToSQL()
+		items, err := r.ListBy(ctx, criteria, WithLimit(limit), WithOffset(offset), sortRule)
 		if err != nil {
 			return err
 		}
 
-		if err = r.db.Select(ctx, sql, nil, &res); err != nil {
-			return err
-		}
-
-		if len(res) <= 0 {
+		if len(items) <= 0 {
 			break
 		}
 
-		data := make(map[string]interface{})
-		for k := range res {
-			data[res[k].GetIdentity()] = res[k]
+		var data []any
+		for _, item := range items {
+			data = append(data, item.GetModelIndex())
 		}
 
-		err = r.Index.BulkIndex(data)
-		if err != nil {
+		if err = r.meili.AddDocuments(r.indexName, data); err != nil {
 			return err
 		}
 

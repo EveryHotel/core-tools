@@ -14,6 +14,7 @@ require (
 	github.com/guregu/null v4.0.0+incompatible
 	github.com/jackc/pgx/v4 v4.14.1
 	github.com/jonboulle/clockwork v0.1.0
+	github.com/meilisearch/meilisearch-go v0.25.0
 	github.com/onsi/ginkgo/v2 v2.6.1
 	github.com/onsi/gomega v1.24.2
 	github.com/sirupsen/logrus v1.9.0
@@ -22,8 +23,10 @@ require (
 )
 
 require (
+	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-test/deep v1.0.8 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.10.1 // indirect
@@ -34,9 +37,14 @@ require (
 	github.com/jackc/pgtype v1.9.1 // indirect
 	github.com/jackc/puddle v1.2.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/josharian/intern v1.0.0 // indirect
+	github.com/klauspost/compress v1.15.6 // indirect
+	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/rabbitmq/amqp091-go v1.3.0 // indirect
 	github.com/toorop/go-dkim v0.0.0-20201103131630-e1cd1a0a5208 // indirect
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.37.1-0.20220607072126-8a320890c08d // indirect
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
