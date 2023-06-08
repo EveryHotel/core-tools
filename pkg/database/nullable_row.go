@@ -167,6 +167,8 @@ func TransformNullableToDest(fieldOrig reflect.Value, field any) reflect.Value {
 	default:
 		if fieldOrig.Type().String() == reflect.TypeOf(time.Time{}).String() {
 			fieldOrig = reflect.ValueOf((*(field.(*null.Time))).Time)
+		} else {
+			fieldOrig = reflect.ValueOf(field).Elem()
 		}
 	}
 

@@ -13,6 +13,7 @@ type SanitizeOption func(*sanitizeOptionHandler)
 type sanitizeOptionHandler struct {
 	relationDests []any
 	relations     []string
+	posRelations  []int
 	cols          []any
 }
 
@@ -22,6 +23,7 @@ func Sanitize(dest any, opts ...SanitizeOption) []any {
 	var cols []any
 	var relationDests []any
 	var relations []string
+	var posRelations []int
 
 	for i := 0; i < vDest.NumField(); i++ {
 		typeField := vDest.Type().Field(i)
@@ -44,10 +46,11 @@ func Sanitize(dest any, opts ...SanitizeOption) []any {
 			}
 			relationDests = append(relationDests, vDestI)
 			relations = append(relations, relationsField[0])
+			posRelations = append(posRelations, len(cols))
 		}
 	}
 
-	optHandler := newSanitizeOptionHandler(cols, relationDests, relations)
+	optHandler := newSanitizeOptionHandler(cols, relationDests, relations, posRelations)
 	for _, opt := range opts {
 		opt(optHandler)
 	}
@@ -55,10 +58,11 @@ func Sanitize(dest any, opts ...SanitizeOption) []any {
 	return optHandler.GetCols()
 }
 
-func newSanitizeOptionHandler(cols []any, relationDests []any, relations []string) *sanitizeOptionHandler {
+func newSanitizeOptionHandler(cols []any, relationDests []any, relations []string, posRelations []int) *sanitizeOptionHandler {
 	return &sanitizeOptionHandler{
 		relationDests: relationDests,
 		relations:     relations,
+		posRelations:  posRelations,
 		cols:          cols,
 	}
 }
@@ -86,10 +90,23 @@ func (o *sanitizeOptionHandler) ApplyPrefix(p string) {
 
 // SetRelations ищет по префиксу всех связей в структуре
 func (o *sanitizeOptionHandler) SetRelations(rels ...string) {
+	countShift := 0
 	for i, relation := range o.relations {
 		for _, rel := range rels {
 			if relation == rel {
-				o.cols = append(o.cols, Sanitize(o.relationDests[i], WithPrefix(rel))...)
+				relationsCols := Sanitize(o.relationDests[i], WithPrefix(rel))
+
+				positionShift := o.posRelations[i] + countShift
+				beforeCols := make([]any, len(o.cols[:positionShift]))
+				copy(beforeCols, o.cols[:positionShift])
+
+				afterCols := make([]any, len(o.cols[positionShift:]))
+				copy(afterCols, o.cols[positionShift:])
+
+				o.cols = append(beforeCols, relationsCols...)
+				o.cols = append(o.cols, afterCols...)
+
+				countShift += len(relationsCols)
 				break
 			}
 		}
