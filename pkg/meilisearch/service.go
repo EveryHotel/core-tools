@@ -81,7 +81,7 @@ func (s meiliService) UpdateDocuments(indexName string, documents any) error {
 func (s meiliService) SearchDocuments(indexName string, q string) ([]any, error) {
 	index := s.client.Index(indexName)
 
-	resp, err := index.Search(q, nil)
+	resp, err := index.Search(q, &meilisearch.SearchRequest{})
 	if err != nil {
 		return nil, err
 	}
