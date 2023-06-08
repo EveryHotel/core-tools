@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -11,18 +12,18 @@ import (
 	"github.com/EveryHotel/core-tools/pkg/meilisearch"
 )
 
-type IndexableModel interface {
-	GetModelIndex() any
+type IndexableModel[I any] interface {
+	GetModelIndex() I
 	IsDeleted() bool
 }
 
-type IndexableBaseRepo[E IndexableModel, ID int64 | string] interface {
+type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface {
 	BaseRepo[E, ID]
 	Reindex(ctx context.Context) error
 	UpdateIndex(entity E) error
 }
 
-type indexableBaseRepo[E IndexableModel, ID int64 | string] struct {
+type indexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] struct {
 	BaseRepo[E, ID]
 	meili     meilisearch.MeiliService
 	indexName string
@@ -30,13 +31,13 @@ type indexableBaseRepo[E IndexableModel, ID int64 | string] struct {
 	setId     func(ptr *E, id ID)
 }
 
-func NewIndexableRepository[E IndexableModel, ID int64 | string](
+func NewIndexableRepository[I any, E IndexableModel[I], ID int64 | string](
 	db database.DBService,
 	meili meilisearch.MeiliService,
 	indexName, tableName, alias, idColumn string,
 	setId func(ptr *E, id ID),
-) IndexableBaseRepo[E, ID] {
-	return &indexableBaseRepo[E, ID]{
+) IndexableBaseRepo[I, E, ID] {
+	return &indexableBaseRepo[I, E, ID]{
 		BaseRepo:  NewRepository[E, ID](db, tableName, alias, idColumn),
 		meili:     meili,
 		indexName: indexName,
@@ -46,7 +47,7 @@ func NewIndexableRepository[E IndexableModel, ID int64 | string](
 }
 
 // Create Создает новую сущность
-func (r *indexableBaseRepo[E, ID]) Create(ctx context.Context, entity E) (ID, error) {
+func (r *indexableBaseRepo[I, E, ID]) Create(ctx context.Context, entity E) (ID, error) {
 	id, err := r.BaseRepo.Create(ctx, entity)
 	if err != nil {
 		return id, err
@@ -59,7 +60,7 @@ func (r *indexableBaseRepo[E, ID]) Create(ctx context.Context, entity E) (ID, er
 }
 
 // Update Обновляет сущность
-func (r *indexableBaseRepo[E, ID]) Update(ctx context.Context, entity E) error {
+func (r *indexableBaseRepo[I, E, ID]) Update(ctx context.Context, entity E) error {
 	if err := r.BaseRepo.Update(ctx, entity); err != nil {
 		return err
 	}
@@ -69,8 +70,28 @@ func (r *indexableBaseRepo[E, ID]) Update(ctx context.Context, entity E) error {
 	return nil
 }
 
+func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string) ([]I, error) {
+	items, err := r.meili.SearchDocuments(r.indexName, term)
+	if err != nil {
+		return nil, err
+	}
+
+	var res []I
+	// TODO: временное решение, чтобы преобразовывать в нужный тип
+	encoded, err := json.Marshal(items)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = json.Unmarshal(encoded, &res); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // UpdateIndex обновляет индекс сущности
-func (r *indexableBaseRepo[E, ID]) UpdateIndex(entity E) error {
+func (r *indexableBaseRepo[I, E, ID]) UpdateIndex(entity E) error {
 	if entity.IsDeleted() {
 		return nil
 	}
@@ -86,7 +107,7 @@ func (r *indexableBaseRepo[E, ID]) UpdateIndex(entity E) error {
 }
 
 // Reindex переиндексация всех сущностей
-func (r *indexableBaseRepo[E, ID]) Reindex(ctx context.Context) error {
+func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 	var (
 		err           error
 		limit, offset int64
