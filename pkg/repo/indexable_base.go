@@ -121,8 +121,10 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 
 	limit = 500
 	offset = 0
-	criteria := map[string]any{
-		r.alias + ".deleted_at": nil,
+	criteria := make(map[string]any)
+
+	if IsSoftDeletingEntity(*new(E)) {
+		criteria[r.alias+".deleted_at"] = nil
 	}
 	sortRule := WithSort([]exp.OrderedExpression{goqu.I(r.alias + ".id").Asc()})
 
