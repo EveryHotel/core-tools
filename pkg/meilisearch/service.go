@@ -33,7 +33,7 @@ func (s meiliService) AddDocuments(indexName string, documents any) error {
 	}
 
 	index := s.client.Index(indexName)
-	_, err = index.AddDocuments(encoded)
+	_, err = index.AddDocuments(encoded, "id")
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (s meiliService) UpdateDocuments(indexName string, documents any) error {
 	}
 
 	index := s.client.Index(indexName)
-	_, err = index.UpdateDocuments(encoded)
+	_, err = index.UpdateDocuments(encoded, "id")
 	if err != nil {
 		return err
 	}
