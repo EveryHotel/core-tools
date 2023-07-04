@@ -32,7 +32,7 @@ func NewS3Storage(endpoint string, region string, bucket string, accessId string
 	}
 }
 
-func (s *s3Storage) Save(path string, mimeType string, file io.Reader) error {
+func (s *s3Storage) Save(path string, mimeType string, file io.Reader) (int64, error) {
 	upload := s3manager.UploadInput{
 		ACL:    aws.String("public-read"),
 		Body:   file,
@@ -47,8 +47,19 @@ func (s *s3Storage) Save(path string, mimeType string, file io.Reader) error {
 	uploader := s3manager.NewUploader(s.s3Session)
 
 	_, err := uploader.Upload(&upload)
+	if err != nil {
+		return 0, err
+	}
 
-	return err
+	headObj := s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(path),
+	}
+	result, err := s3.New(s.s3Session).HeadObject(&headObj)
+	if err != nil {
+		return 0, err
+	}
+	return aws.Int64Value(result.ContentLength), nil
 }
 
 func (s *s3Storage) Get(path string) (io.ReadCloser, error) {

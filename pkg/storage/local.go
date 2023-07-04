@@ -23,24 +23,24 @@ func NewLocalStorage(directory string, urlPrefix string) StorageService {
 	}
 }
 
-func (s *localStorage) Save(path string, mimeType string, file io.Reader) error {
+func (s *localStorage) Save(path string, mimeType string, file io.Reader) (int64, error) {
 	apath, err := s.getAbsolute(path)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	err = os.MkdirAll(filepath.Dir(apath), os.ModePerm)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	f, err := os.Create(apath)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	_, err = io.Copy(f, file)
+	bytesNumber, err := io.Copy(f, file)
 
-	return err
+	return bytesNumber, err
 }
 
 func (s *localStorage) Get(path string) (io.ReadCloser, error) {
