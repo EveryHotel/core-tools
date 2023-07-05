@@ -20,6 +20,7 @@ type IndexableModel[I any] interface {
 type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface {
 	BaseRepo[E, ID]
 	Reindex(ctx context.Context) error
+	GetValue(id int64) (I, error)
 	SearchByTerm(string) ([]I, error)
 	UpdateIndex(entity E) error
 }
@@ -89,6 +90,17 @@ func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string) ([]I, error) {
 	}
 
 	return res, nil
+}
+
+func (r *indexableBaseRepo[I, E, ID]) GetValue(id int64) (I, error) {
+	var item I
+
+	err := r.meili.GetDocument(r.indexName, id, &item)
+	if err != nil {
+		return item, err
+	}
+
+	return item, nil
 }
 
 // UpdateIndex обновляет индекс сущности
