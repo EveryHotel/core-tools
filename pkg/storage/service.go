@@ -64,6 +64,7 @@ func (s *fileService) Upload(ctx context.Context, storageName string, uploadPref
 	if err != nil {
 		return FileInfo{}, err
 	}
+
 	return FileInfo{
 		Uuid:     u.String(),
 		Path:     uploadedPath,
@@ -86,12 +87,7 @@ func (s *fileService) UploadWithFileName(ctx context.Context, storageName string
 		return "", size, err
 	}
 
-	uploadedPath, err := storageService.GetUrl(location)
-	if err != nil {
-		return "", size, err
-	}
-
-	return uploadedPath, size, nil
+	return location, size, nil
 }
 
 // GetUrl - получает ссылку на файл в хранилище
