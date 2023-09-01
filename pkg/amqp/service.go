@@ -10,13 +10,16 @@ type AmqpService interface {
 	AddConsumer(ConsumerService)
 	Publish(Task, []string) error
 	Serve() error
+	Close() error
 }
 
 type amqpService struct {
-	amqpUrl      string
-	exchangeName string
-	exchangeType string
-	consumers    []ConsumerService
+	amqpUrl           string
+	exchangeName      string
+	exchangeType      string
+	consumers         []ConsumerService
+	connection        *rabbitmq.Conn
+	internalConsumers []*rabbitmq.Consumer
 }
 
 func NewAmqpService(amqpUrl string, exchangeName, exchangeType string) AmqpService {
@@ -33,9 +36,20 @@ func (s *amqpService) AddConsumer(consumer ConsumerService) {
 }
 
 // Publish публикует новую задачу в пулл по заданным routingKeys
-func (s amqpService) Publish(task Task, routingKeys []string) error {
-	publisher, err := rabbitmq.NewPublisher(s.amqpUrl,
-		rabbitmq.Config{},
+func (s *amqpService) Publish(task Task, routingKeys []string) error {
+	conn, err := rabbitmq.NewConn(
+		s.amqpUrl,
+		rabbitmq.WithConnectionOptionsLogging,
+	)
+	if err != nil {
+		return err
+	}
+
+	defer conn.Close()
+
+	publisher, err := rabbitmq.NewPublisher(conn,
+		rabbitmq.WithPublisherOptionsLogging,
+		rabbitmq.WithPublisherOptionsExchangeName(s.exchangeName),
 	)
 	if err != nil {
 		return err
@@ -76,10 +90,17 @@ func (s *amqpService) Serve() error {
 
 // runConsumer запускает обработчика задач в работу
 func (s *amqpService) runConsumer(consumerService ConsumerService) error {
-	consumer, err := rabbitmq.NewConsumer(s.amqpUrl,
-		rabbitmq.Config{},
-		rabbitmq.WithConsumerOptionsLogging,
-	)
+	var err error
+	if s.connection == nil {
+		s.connection, err = rabbitmq.NewConn(
+			s.amqpUrl,
+			rabbitmq.WithConnectionOptionsLogging,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	if err != nil {
 		return err
 	}
@@ -88,18 +109,31 @@ func (s *amqpService) runConsumer(consumerService ConsumerService) error {
 		return s.handleMessage(message, consumerService)
 	}
 
-	err = consumer.StartConsuming(handler,
+	opts := []func(options *rabbitmq.ConsumerOptions){
+		rabbitmq.WithConsumerOptionsExchangeName(s.exchangeName),
+		rabbitmq.WithConsumerOptionsExchangeKind(s.exchangeType),
+		rabbitmq.WithConsumerOptionsConsumerAutoAck(false),
+		rabbitmq.WithConsumerOptionsQueueDurable,
+		rabbitmq.WithConsumerOptionsExchangeDurable,
+		rabbitmq.WithConsumerOptionsConcurrency(consumerService.GetConcurrency()),
+	}
+
+	for _, routing := range consumerService.GetRoutingKeys() {
+		opts = append(opts, rabbitmq.WithConsumerOptionsRoutingKey(routing))
+	}
+
+	consumer, err := rabbitmq.NewConsumer(s.connection,
+		handler,
 		consumerService.GetQueueName(),
-		consumerService.GetRoutingKeys(),
-		rabbitmq.WithConsumeOptionsBindingExchangeName(s.exchangeName),
-		rabbitmq.WithConsumeOptionsBindingExchangeKind(s.exchangeType),
-		rabbitmq.WithConsumeOptionsConsumerAutoAck(false),
-		rabbitmq.WithConsumeOptionsQueueDurable,
-		rabbitmq.WithConsumeOptionsBindingExchangeDurable,
-		rabbitmq.WithConsumeOptionsConcurrency(consumerService.GetConcurrency()),
+		opts...,
 	)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	s.internalConsumers = append(s.internalConsumers, consumer)
+	return nil
 }
 
 // handleMessage функция обертка для обработки сообщений
@@ -121,4 +155,19 @@ func (s *amqpService) handleMessage(message rabbitmq.Delivery, consumer Consumer
 	}
 
 	return res
+}
+
+func (s *amqpService) Close() error {
+	for _, consumer := range s.internalConsumers {
+		consumer.Close()
+	}
+
+	if s.connection != nil {
+		err := s.connection.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
