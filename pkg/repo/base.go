@@ -24,6 +24,7 @@ type BaseRepo[T any, ID int64 | string] interface {
 	Update(context.Context, T) error
 	CreateMultiple(context.Context, []T) ([]ID, error)
 	UpdateMultiple(context.Context, []T) error
+	ForceDeleteMultiple(context.Context, []ID) error
 }
 
 type baseRepo[T any, ID int64 | string] struct {
@@ -76,7 +77,7 @@ type ListOptionHandler struct {
 }
 
 // BulkUpdate обновляет записи в таблице по заданному условию
-func (r baseRepo[T, ID]) BulkUpdate(ctx context.Context, updateFields, where map[string]interface{}) error {
+func (r *baseRepo[T, ID]) BulkUpdate(ctx context.Context, updateFields, where map[string]interface{}) error {
 	ds := goqu.Update(r.tableName).
 		Where(goqu.Ex(where)).
 		Set(goqu.Record(updateFields))
@@ -104,7 +105,7 @@ func (r baseRepo[T, ID]) BulkUpdate(ctx context.Context, updateFields, where map
 }
 
 // Create создает новую сущность
-func (r baseRepo[T, ID]) Create(ctx context.Context, entity T) (ID, error) {
+func (r *baseRepo[T, ID]) Create(ctx context.Context, entity T) (ID, error) {
 	_, rows := SanitizeRowsForInsert[ID](entity)
 
 	ds := goqu.Insert(r.tableName).
@@ -135,7 +136,7 @@ func (r baseRepo[T, ID]) Create(ctx context.Context, entity T) (ID, error) {
 }
 
 // Update обновляет сущность
-func (r baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
+func (r *baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
 	id, rows := SanitizeRowsForUpdate[ID](entity)
 
 	ds := goqu.Update(r.tableName).
@@ -166,7 +167,7 @@ func (r baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
 }
 
 // Get возвращает сущность по id
-func (r baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
+func (r *baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
 	var entity T
 
 	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
@@ -197,7 +198,7 @@ func (r baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
 }
 
 // GetOneBy возвращает сущность по указанным параметрам
-func (r baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]interface{}) (T, error) {
+func (r *baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]interface{}) (T, error) {
 	var entity T
 
 	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
@@ -225,7 +226,7 @@ func (r baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]int
 }
 
 // List возвращает список сущностей
-func (r baseRepo[T, ID]) List(ctx context.Context) ([]T, error) {
+func (r *baseRepo[T, ID]) List(ctx context.Context) ([]T, error) {
 	var res []T
 
 	ds := goqu.Select(database.Sanitize(*new(T), database.WithPrefix(r.alias))...).
@@ -251,7 +252,7 @@ func (r baseRepo[T, ID]) List(ctx context.Context) ([]T, error) {
 }
 
 // ListBy возвращает список сущностей по критерию
-func (r baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interface{}, options ...ListOption) ([]T, error) {
+func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interface{}, options ...ListOption) ([]T, error) {
 	var res []T
 
 	optHandler := NewListOptionHandler()
@@ -299,7 +300,7 @@ func (r baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interfa
 }
 
 // Delete удаление записи из таблицы
-func (r baseRepo[T, ID]) Delete(ctx context.Context, id ID) error {
+func (r *baseRepo[T, ID]) Delete(ctx context.Context, id ID) error {
 	isSoftDeleting := IsSoftDeletingEntity(*new(T))
 
 	if isSoftDeleting {
@@ -310,7 +311,7 @@ func (r baseRepo[T, ID]) Delete(ctx context.Context, id ID) error {
 }
 
 // ForceDelete прямое удаление из базы элемента
-func (r baseRepo[T, ID]) ForceDelete(ctx context.Context, id ID) error {
+func (r *baseRepo[T, ID]) ForceDelete(ctx context.Context, id ID) error {
 	ds := goqu.Delete(r.tableName).
 		Where(goqu.C(r.idColumn).Eq(id))
 
@@ -337,7 +338,7 @@ func (r baseRepo[T, ID]) ForceDelete(ctx context.Context, id ID) error {
 }
 
 // SoftDelete помечает сущность, как удаленную
-func (r baseRepo[T, ID]) SoftDelete(ctx context.Context, id ID) error {
+func (r *baseRepo[T, ID]) SoftDelete(ctx context.Context, id ID) error {
 	ds := goqu.Update(r.tableName).
 		Where(goqu.C(r.idColumn).Eq(id)).
 		Set(goqu.Record{
@@ -367,7 +368,7 @@ func (r baseRepo[T, ID]) SoftDelete(ctx context.Context, id ID) error {
 }
 
 // CreateMultiple - создает сразу несколько записей в таблице
-func (r baseRepo[T, ID]) CreateMultiple(ctx context.Context, entities []T) ([]ID, error) {
+func (r *baseRepo[T, ID]) CreateMultiple(ctx context.Context, entities []T) ([]ID, error) {
 	if len(entities) == 0 {
 		return nil, nil
 	}
@@ -449,6 +450,33 @@ func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) erro
 			"table":  r.tableName,
 			"values": records,
 		}).Error("Cannot exec multiple update", err)
+		return err
+	}
+
+	return nil
+}
+
+// ForceDeleteMultiple прямое удаление множества сущностей по ids
+func (r *baseRepo[T, ID]) ForceDeleteMultiple(ctx context.Context, ids []ID) error {
+	ds := goqu.Delete(r.tableName).
+		Where(goqu.C(r.idColumn).In(ids))
+
+	sql, args, err := ds.ToSQL()
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"table": r.tableName,
+			"ids":   ids,
+			"sql":   sql,
+		}).Error("Cannot build sql query for delete", err)
+		return err
+	}
+
+	err = r.db.Exec(ctx, sql, args)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"table": r.tableName,
+			"ids":   ids,
+		}).Error("Error during exec delete", err)
 		return err
 	}
 
