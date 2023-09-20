@@ -50,6 +50,7 @@ func (s *amqpService) Publish(task Task, routingKeys []string) error {
 	publisher, err := rabbitmq.NewPublisher(conn,
 		rabbitmq.WithPublisherOptionsLogging,
 		rabbitmq.WithPublisherOptionsExchangeName(s.exchangeName),
+		rabbitmq.WithPublisherOptionsExchangeDeclare,
 	)
 	if err != nil {
 		return err
@@ -113,6 +114,7 @@ func (s *amqpService) runConsumer(consumerService ConsumerService) error {
 		rabbitmq.WithConsumerOptionsExchangeName(s.exchangeName),
 		rabbitmq.WithConsumerOptionsExchangeKind(s.exchangeType),
 		rabbitmq.WithConsumerOptionsConsumerAutoAck(false),
+		rabbitmq.WithConsumerOptionsExchangeDeclare,
 		rabbitmq.WithConsumerOptionsQueueDurable,
 		rabbitmq.WithConsumerOptionsExchangeDurable,
 		rabbitmq.WithConsumerOptionsConcurrency(consumerService.GetConcurrency()),
