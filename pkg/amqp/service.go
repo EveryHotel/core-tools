@@ -51,6 +51,7 @@ func (s *amqpService) Publish(task Task, routingKeys []string) error {
 		rabbitmq.WithPublisherOptionsLogging,
 		rabbitmq.WithPublisherOptionsExchangeName(s.exchangeName),
 		rabbitmq.WithPublisherOptionsExchangeDeclare,
+		rabbitmq.WithPublisherOptionsExchangeDurable,
 	)
 	if err != nil {
 		return err
