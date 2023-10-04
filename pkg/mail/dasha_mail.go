@@ -2,6 +2,7 @@ package mail
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +25,19 @@ func NewDashaMailService(apiKey string) MailService {
 	return &dashaMailService{
 		apiKey: apiKey,
 	}
+}
+
+type dashaResponse struct {
+	Response struct {
+		Msg struct {
+			ErrCode int    `json:"err_code"`
+			Text    string `json:"text"`
+			Type    string `json:"type"`
+		} `json:"msg"`
+		Data struct {
+			TransactionId string `json:"transaction_id"`
+		} `json:"data"`
+	} `json:"response"`
 }
 
 // Send Отправляет письмо
@@ -54,20 +68,33 @@ func (s *dashaMailService) Send(email EmailMessage) error {
 		}).Error(fmt.Sprintf("cant'n form email: ", err))
 		return err
 	}
-
-	req, err := http.NewRequest(http.MethodPost, dashaApiUrl, &form)
+	response, err := s.doRequest(form, contentType)
 	if err != nil {
 		return err
 	}
+	if response.Response.Msg.ErrCode > 0 {
+		err = fmt.Errorf("dashamail transaction: %s, error: %s, ", response.Response.Msg.Text, response.Response.Data.TransactionId)
+		logrus.Error(err)
+		return err
+	}
+	return nil
+}
 
-	req.Header.Add("Content-Type", contentType)
+func (s *dashaMailService) doRequest(form bytes.Buffer, formContentType string) (dashaResponse, error) {
+	req, err := http.NewRequest(http.MethodPost, dashaApiUrl, &form)
+	if err != nil {
+		return dashaResponse{}, err
+	}
+
+	req.Header.Add("Content-Type", formContentType)
 
 	client := &http.Client{}
 
 	response, err := client.Do(req)
 	if err != nil {
-		return err
+		return dashaResponse{}, err
 	}
+	defer response.Body.Close()
 
 	if response.StatusCode < 200 || response.StatusCode > 300 {
 		defer response.Body.Close()
@@ -75,10 +102,18 @@ func (s *dashaMailService) Send(email EmailMessage) error {
 		logrus.WithFields(logrus.Fields{
 			"status": response.StatusCode,
 		}).Error(body)
-		return errors.New(fmt.Sprintf("mail sending error statusCode: %d, %s", response.StatusCode, body))
+		return dashaResponse{}, errors.New(fmt.Sprintf("mail sending error statusCode: %d, %s", response.StatusCode, body))
 	}
 
-	return nil
+	var apiResponse dashaResponse
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return dashaResponse{}, fmt.Errorf("dashamail: can't fetch response %v", err)
+	}
+	if err = json.Unmarshal(responseBody, &apiResponse); err != nil {
+		return dashaResponse{}, fmt.Errorf("dashamail: can't unmarshal response %s")
+	}
+	return apiResponse, nil
 }
 
 func prepareForm(fields map[string]string, values map[string]Attachment) (bytes.Buffer, string, error) {
