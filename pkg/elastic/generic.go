@@ -1,6 +1,7 @@
 package elastic
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"strconv"
@@ -16,7 +17,7 @@ type Index[T any] interface {
 type GenericIndex[I Index[T], T any] interface {
 	BaseIndexInterface
 	Update(T) error
-	SearchByName(term string, filters map[string]any) ([]I, error)
+	SearchByName(ctx context.Context, term string, filters map[string]any) ([]I, error)
 	GetValue(id int64) (I, error)
 }
 
@@ -74,7 +75,7 @@ func (i genericIndex[I, T]) Update(entity T) error {
 }
 
 // SearchByName поиск сущности в индексе по названию
-func (i genericIndex[I, T]) SearchByName(term string, filters map[string]any) ([]I, error) {
+func (i genericIndex[I, T]) SearchByName(ctx context.Context, term string, filters map[string]any) ([]I, error) {
 	var res []I
 
 	response, err := i.SearchBy(term, []string{"name_ru", "name_en"}, filters)
@@ -86,12 +87,13 @@ func (i genericIndex[I, T]) SearchByName(term string, filters map[string]any) ([
 		item := *new(I)
 		bytes, err1 := json.Marshal(hit.Source)
 		if err2 := json.Unmarshal(bytes, &item); err1 != nil || err2 != nil {
-			logrus.WithFields(logrus.Fields{
-				"marshal":   err1,
-				"unmarshal": err2,
-				"index":     reflect.TypeOf(item).Name(),
-				"term":      term,
-			}).Warn("cannot convert entity search item")
+			logrus.WithContext(ctx).
+				WithFields(logrus.Fields{
+					"marshal":   err1,
+					"unmarshal": err2,
+					"index":     reflect.TypeOf(item).Name(),
+					"term":      term,
+				}).Warn("cannot convert entity search item")
 		}
 		res = append(res, item)
 	}

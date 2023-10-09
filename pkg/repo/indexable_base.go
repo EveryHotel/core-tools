@@ -22,7 +22,7 @@ type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface 
 	Reindex(ctx context.Context) error
 	GetValue(id int64) (I, error)
 	SearchByTerm(string) ([]I, error)
-	UpdateIndex(entity E) error
+	UpdateIndex(ctx context.Context, entity E) error
 }
 
 type indexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] struct {
@@ -56,7 +56,7 @@ func (r *indexableBaseRepo[I, E, ID]) Create(ctx context.Context, entity E) (ID,
 	}
 
 	r.setId(&entity, id)
-	_ = r.UpdateIndex(entity)
+	_ = r.UpdateIndex(ctx, entity)
 
 	return id, nil
 }
@@ -67,7 +67,7 @@ func (r *indexableBaseRepo[I, E, ID]) Update(ctx context.Context, entity E) erro
 		return err
 	}
 
-	_ = r.UpdateIndex(entity)
+	_ = r.UpdateIndex(ctx, entity)
 
 	return nil
 }
@@ -104,16 +104,17 @@ func (r *indexableBaseRepo[I, E, ID]) GetValue(id int64) (I, error) {
 }
 
 // UpdateIndex обновляет индекс сущности
-func (r *indexableBaseRepo[I, E, ID]) UpdateIndex(entity E) error {
+func (r *indexableBaseRepo[I, E, ID]) UpdateIndex(ctx context.Context, entity E) error {
 	if entity.IsDeleted() {
 		return nil
 	}
 
 	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex()); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"index":  r.indexName,
-			"entity": entity,
-		}).Error("cannot update entity search index ", err)
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"index":  r.indexName,
+				"entity": entity,
+			}).Error("cannot update entity search index ", err)
 	}
 
 	return nil

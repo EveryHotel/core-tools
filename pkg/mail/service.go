@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -44,10 +45,10 @@ type EmailMessage struct {
 }
 
 type MailService interface {
-	Send(email EmailMessage) error
+	Send(ctx context.Context, email EmailMessage) error
 }
 
-//String преобразует адрес к формату rfc 822
+// String преобразует адрес к формату rfc 822
 func (a *Address) String() string {
 	if a.DisplayName != "" {
 		return fmt.Sprintf("%s <%s>", a.DisplayName, a.Mail)

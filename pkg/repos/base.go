@@ -40,29 +40,32 @@ func (r BaseRepo) Delete(ctx context.Context, id int64) error {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"table": r.TableName,
-			"id":    id,
-		}).Error("Cannot build sql query for delete", err)
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"table": r.TableName,
+				"id":    id,
+			}).Error("Cannot build sql query for delete", err)
 		return err
 	}
 
 	err = r.DB.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"table": r.TableName,
-			"id":    id,
-		}).Error("Cannot exec delete", err)
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"table": r.TableName,
+				"id":    id,
+			}).Error("Cannot exec delete", err)
 		return err
 	}
 
 	if r.Index != nil {
 		err = r.Index.Delete(strconv.Itoa(int(id)))
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"table": r.TableName,
-				"id":    id,
-			}).Error("Cannot delete search index", err)
+			logrus.WithContext(ctx).
+				WithFields(logrus.Fields{
+					"table": r.TableName,
+					"id":    id,
+				}).Error("Cannot delete search index", err)
 		}
 	}
 
@@ -80,21 +83,23 @@ func (r BaseRepo) BulkUpdate(ctx context.Context, updateFields, where map[string
 	sql, args, err := ds.ToSQL()
 
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"table":  r.TableName,
-			"update": updateFields,
-			"where":  where,
-		}).Error("Cannot build sql query for bulk update", err)
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"table":  r.TableName,
+				"update": updateFields,
+				"where":  where,
+			}).Error("Cannot build sql query for bulk update", err)
 		return err
 	}
 
 	err = r.DB.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"table":  r.TableName,
-			"update": updateFields,
-			"where":  where,
-		}).Error("Cannot exec bulk update", err)
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"table":  r.TableName,
+				"update": updateFields,
+				"where":  where,
+			}).Error("Cannot exec bulk update", err)
 		return err
 	}
 

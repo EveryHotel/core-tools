@@ -1,6 +1,9 @@
 package mail
 
 import (
+	"context"
+
+	"github.com/sirupsen/logrus"
 	mail "github.com/xhit/go-simple-mail/v2"
 )
 
@@ -15,7 +18,7 @@ func NewSmtpMailService(clientConfig *mail.SMTPServer) MailService {
 }
 
 // Send отправляет письмо через smtp сервер
-func (s *smtpMailService) Send(email EmailMessage) error {
+func (s *smtpMailService) Send(ctx context.Context, email EmailMessage) error {
 	msg := mail.NewMSG()
 	msg.SetFrom(email.From.String()).
 		SetSubject(email.Subject)
@@ -50,10 +53,15 @@ func (s *smtpMailService) Send(email EmailMessage) error {
 	}
 
 	client, err := s.clientConfig.Connect()
-
 	if err != nil {
+		logrus.WithContext(ctx).WithError(err).Error("can't connect to smtp")
 		return err
 	}
 
-	return msg.Send(client)
+	if err = msg.Send(client); err != nil {
+		logrus.WithContext(ctx).WithError(err).Error("error during send smtp mail")
+		return err
+	}
+
+	return nil
 }

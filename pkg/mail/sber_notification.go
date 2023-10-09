@@ -2,6 +2,7 @@ package mail
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,7 +37,7 @@ func NewSberMailService(identityService sberIdentity.SberIdentityService, apiUrl
 }
 
 // Send Отправляет письмо через апи сбера
-func (s *sberMailService) Send(email EmailMessage) error {
+func (s *sberMailService) Send(ctx context.Context, email EmailMessage) error {
 	if s.token == "" || s.tokenExpiredAt < time.Now().Unix() {
 		response, err := s.identityService.Identity([]string{sberIdentity.ScopeNotificationMail})
 		if err != nil {
@@ -88,7 +89,7 @@ func (s *sberMailService) Send(email EmailMessage) error {
 	if response.StatusCode < 200 || response.StatusCode > 300 {
 		defer response.Body.Close()
 		body, _ := io.ReadAll(response.Body)
-		logrus.WithFields(logrus.Fields{
+		logrus.WithContext(ctx).WithFields(logrus.Fields{
 			"status": response.StatusCode,
 		}).Error(body)
 		return errors.New(fmt.Sprintf("mail sending error statusCode: %d, %s", response.StatusCode, body))

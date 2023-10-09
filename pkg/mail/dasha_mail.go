@@ -2,6 +2,7 @@ package mail
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +42,7 @@ type dashaResponse struct {
 }
 
 // Send Отправляет письмо
-func (s *dashaMailService) Send(email EmailMessage) error {
+func (s *dashaMailService) Send(ctx context.Context, email EmailMessage) error {
 	var toEmails []string
 	for _, to := range email.To {
 		toEmails = append(toEmails, to.String())
@@ -63,24 +64,25 @@ func (s *dashaMailService) Send(email EmailMessage) error {
 
 	form, contentType, err := prepareForm(params, attaches)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"params": params,
-		}).Error(fmt.Sprintf("cant'n form email: ", err))
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"params": params,
+			}).Error(fmt.Sprintf("cant'n form email: ", err))
 		return err
 	}
-	response, err := s.doRequest(form, contentType)
+	response, err := s.doRequest(ctx, form, contentType)
 	if err != nil {
 		return err
 	}
 	if response.Response.Msg.ErrCode > 0 {
 		err = fmt.Errorf("dashamail transaction: %s, error: %s, ", response.Response.Msg.Text, response.Response.Data.TransactionId)
-		logrus.Error(err)
+		logrus.WithContext(ctx).Error(err)
 		return err
 	}
 	return nil
 }
 
-func (s *dashaMailService) doRequest(form bytes.Buffer, formContentType string) (dashaResponse, error) {
+func (s *dashaMailService) doRequest(ctx context.Context, form bytes.Buffer, formContentType string) (dashaResponse, error) {
 	req, err := http.NewRequest(http.MethodPost, dashaApiUrl, &form)
 	if err != nil {
 		return dashaResponse{}, err
@@ -99,9 +101,10 @@ func (s *dashaMailService) doRequest(form bytes.Buffer, formContentType string) 
 	if response.StatusCode < 200 || response.StatusCode > 300 {
 		defer response.Body.Close()
 		body, _ := io.ReadAll(response.Body)
-		logrus.WithFields(logrus.Fields{
-			"status": response.StatusCode,
-		}).Error(body)
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"status": response.StatusCode,
+			}).Error(body)
 		return dashaResponse{}, errors.New(fmt.Sprintf("mail sending error statusCode: %d, %s", response.StatusCode, body))
 	}
 
