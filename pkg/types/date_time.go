@@ -42,6 +42,10 @@ func (c Date) MarshalJSON() ([]byte, error) {
 }
 
 func (c *Date) Scan(v interface{}) error {
+	if v == nil {
+		return nil
+	}
+
 	c.Time = v.(time.Time)
 	return nil
 }
