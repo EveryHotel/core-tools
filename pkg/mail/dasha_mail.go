@@ -67,7 +67,7 @@ func (s *dashaMailService) Send(ctx context.Context, email EmailMessage) error {
 		logrus.WithContext(ctx).
 			WithFields(logrus.Fields{
 				"params": params,
-			}).Error(fmt.Sprintf("cant'n form email: ", err))
+			}).Error(fmt.Sprintf("cant'n form email: %v", err))
 		return err
 	}
 	response, err := s.doRequest(ctx, form, contentType)
@@ -114,7 +114,7 @@ func (s *dashaMailService) doRequest(ctx context.Context, form bytes.Buffer, for
 		return dashaResponse{}, fmt.Errorf("dashamail: can't fetch response %v", err)
 	}
 	if err = json.Unmarshal(responseBody, &apiResponse); err != nil {
-		return dashaResponse{}, fmt.Errorf("dashamail: can't unmarshal response %s")
+		return dashaResponse{}, fmt.Errorf("dashamail: can't unmarshal response %v", err)
 	}
 	return apiResponse, nil
 }
