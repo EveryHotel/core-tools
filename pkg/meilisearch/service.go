@@ -2,7 +2,6 @@ package meilisearch
 
 import (
 	"encoding/json"
-	"strconv"
 
 	"github.com/meilisearch/meilisearch-go"
 )
@@ -10,8 +9,8 @@ import (
 type MeiliService interface {
 	AddDocuments(string, any) error
 	Clear(string) error
-	DeleteDocument(string, int64) error
-	GetDocument(string, int64, any) error
+	DeleteDocument(string, string) error
+	GetDocument(string, string, any) error
 	SearchDocuments(indexName string, q string) ([]any, error)
 	UpdateDocuments(string, any) error
 }
@@ -49,18 +48,18 @@ func (s meiliService) Clear(indexName string) error {
 	return nil
 }
 
-func (s meiliService) DeleteDocument(indexName string, id int64) error {
-	if _, err := s.client.Index(indexName).DeleteDocument(strconv.Itoa(int(id))); err != nil {
+func (s meiliService) DeleteDocument(indexName string, id string) error {
+	if _, err := s.client.Index(indexName).DeleteDocument(id); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s meiliService) GetDocument(indexName string, id int64, entity any) error {
+func (s meiliService) GetDocument(indexName string, id string, entity any) error {
 	index := s.client.Index(indexName)
 
-	return index.GetDocument(strconv.Itoa(int(id)), nil, entity)
+	return index.GetDocument(id, nil, entity)
 }
 
 func (s meiliService) UpdateDocuments(indexName string, documents any) error {

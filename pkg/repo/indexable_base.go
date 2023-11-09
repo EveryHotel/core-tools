@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
@@ -20,7 +21,7 @@ type IndexableModel[I any] interface {
 type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface {
 	BaseRepo[E, ID]
 	Reindex(ctx context.Context) error
-	GetValue(id int64) (I, error)
+	GetValue(id ID) (I, error)
 	SearchByTerm(string) ([]I, error)
 	UpdateIndex(ctx context.Context, entity E) error
 }
@@ -92,10 +93,12 @@ func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string) ([]I, error) {
 	return res, nil
 }
 
-func (r *indexableBaseRepo[I, E, ID]) GetValue(id int64) (I, error) {
+func (r *indexableBaseRepo[I, E, ID]) GetValue(id ID) (I, error) {
 	var item I
 
-	err := r.meili.GetDocument(r.indexName, id, &item)
+	sId := fmt.Sprintf("%v", id)
+
+	err := r.meili.GetDocument(r.indexName, sId, &item)
 	if err != nil {
 		return item, err
 	}
@@ -161,6 +164,25 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 		}
 
 		offset += limit
+	}
+
+	return nil
+}
+
+// Delete удаляет сущность
+func (r *indexableBaseRepo[I, E, ID]) Delete(ctx context.Context, id ID) error {
+	if err := r.BaseRepo.Delete(ctx, id); err != nil {
+		return err
+	}
+
+	sId := fmt.Sprintf("%v", id)
+
+	if err := r.meili.DeleteDocument(r.indexName, sId); err != nil {
+		logrus.WithContext(ctx).
+			WithFields(logrus.Fields{
+				"index": r.indexName,
+				"id":    sId,
+			}).Error("cannot delete entity search index ", err)
 	}
 
 	return nil
