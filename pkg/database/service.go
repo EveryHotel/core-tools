@@ -254,7 +254,8 @@ func setDestFields(vDest reflect.Value, scanFields []any, relations ...string) [
 
 		if field.Kind() == reflect.Struct && len(relations) > 0 {
 			for _, relation := range relations {
-				if strings.Contains(tag.Get("relation"), relation) {
+				values := strings.Split(tag.Get("relation"), ",")
+				if len(values) > 0 && values[0] == relation {
 					scanFields = setDestFields(field, scanFields)
 				}
 			}
