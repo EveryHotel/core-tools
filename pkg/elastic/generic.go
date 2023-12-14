@@ -3,11 +3,11 @@ package elastic
 import (
 	"context"
 	"encoding/json"
-	"reflect"
+	"fmt"
+	"log/slog"
 	"strconv"
 
 	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/sirupsen/logrus"
 )
 
 type Index[T any] interface {
@@ -41,20 +41,31 @@ type genericIndex[I Index[T], T any] struct {
 
 // GetValue Возвращает содержимое индекса
 func (i genericIndex[I, T]) GetValue(id int64) (I, error) {
-	idx := *new(I)
+	var idx I
 	item, err := i.Get(strconv.FormatInt(id, 10))
 	if err != nil {
 		return idx, err
 	}
 
-	bytes, err1 := json.Marshal(item.Source)
-	if err2 := json.Unmarshal(bytes, &idx); err1 != nil || err2 != nil {
-		logrus.WithFields(logrus.Fields{
-			"marshal":   err1,
-			"unmarshal": err2,
-			"index":     reflect.TypeOf(item).Name(),
-			"id":        id,
-		}).Warn("cannot convert entity search item")
+	idx, err = i.transformSearchHitToIndex(&item)
+	if err != nil {
+		slog.Warn("transformSearchHitToIndex json marshal error",
+			slog.Any("error", err),
+			slog.String("index", fmt.Sprintf("%T", idx)),
+		)
+	}
+	return idx, nil
+}
+
+func (i genericIndex[I, T]) transformSearchHitToIndex(hit *SearchHit) (I, error) {
+	var idx I
+	var bytes []byte
+	var err error
+	if bytes, err = json.Marshal(hit.Source); err != nil {
+		return idx, fmt.Errorf("marshal: %w", err)
+	}
+	if err = json.Unmarshal(bytes, &idx); err != nil {
+		return idx, fmt.Errorf("unmarshal: %w", err)
 	}
 	return idx, nil
 }
@@ -84,16 +95,12 @@ func (i genericIndex[I, T]) SearchByName(ctx context.Context, term string, filte
 	}
 
 	for _, hit := range response.Hits.Hits {
-		item := *new(I)
-		bytes, err1 := json.Marshal(hit.Source)
-		if err2 := json.Unmarshal(bytes, &item); err1 != nil || err2 != nil {
-			logrus.WithContext(ctx).
-				WithFields(logrus.Fields{
-					"marshal":   err1,
-					"unmarshal": err2,
-					"index":     reflect.TypeOf(item).Name(),
-					"term":      term,
-				}).Warn("cannot convert entity search item")
+		item, err := i.transformSearchHitToIndex(hit)
+		if err != nil {
+			slog.Warn("transformSearchHitToIndex json marshal error",
+				slog.Any("error", err),
+				slog.String("index", fmt.Sprintf("%T", hit)),
+			)
 		}
 		res = append(res, item)
 	}

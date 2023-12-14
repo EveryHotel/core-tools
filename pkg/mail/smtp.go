@@ -2,8 +2,8 @@ package mail
 
 import (
 	"context"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	mail "github.com/xhit/go-simple-mail/v2"
 )
 
@@ -54,12 +54,14 @@ func (s *smtpMailService) Send(ctx context.Context, email EmailMessage) error {
 
 	client, err := s.clientConfig.Connect()
 	if err != nil {
-		logrus.WithContext(ctx).WithError(err).Error("can't connect to smtp")
+		slog.ErrorContext(ctx, "smtp connect error",
+			slog.Any("error", err))
 		return err
 	}
 
 	if err = msg.Send(client); err != nil {
-		logrus.WithContext(ctx).WithError(err).Error("error during send smtp mail")
+		slog.ErrorContext(ctx, "smtp send error",
+			slog.Any("error", err))
 		return err
 	}
 

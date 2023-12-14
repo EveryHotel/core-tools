@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
-	"github.com/sirupsen/logrus"
 
 	"github.com/EveryHotel/core-tools/pkg/database"
 	"github.com/EveryHotel/core-tools/pkg/meilisearch"
@@ -113,11 +113,11 @@ func (r *indexableBaseRepo[I, E, ID]) UpdateIndex(ctx context.Context, entity E)
 	}
 
 	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex()); err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"index":  r.indexName,
-				"entity": entity,
-			}).Error("cannot update entity search index ", err)
+		slog.ErrorContext(ctx, "update document error",
+			slog.Any("error", err),
+			slog.String("index", r.indexName),
+			slog.Any("entity", entity),
+		)
 	}
 
 	return nil
@@ -178,11 +178,11 @@ func (r *indexableBaseRepo[I, E, ID]) Delete(ctx context.Context, id ID) error {
 	sId := fmt.Sprintf("%v", id)
 
 	if err := r.meili.DeleteDocument(r.indexName, sId); err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"index": r.indexName,
-				"id":    sId,
-			}).Error("cannot delete entity search index ", err)
+		slog.ErrorContext(ctx, "can't delete entity search index",
+			slog.Any("error", err),
+			slog.String("index", r.indexName),
+			slog.String("id", sId),
+		)
 	}
 
 	return nil

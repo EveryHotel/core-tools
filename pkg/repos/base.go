@@ -2,11 +2,11 @@ package repos
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
-	logrus "github.com/sirupsen/logrus"
 
 	"github.com/EveryHotel/core-tools/pkg/database"
 	"github.com/EveryHotel/core-tools/pkg/elastic"
@@ -40,32 +40,31 @@ func (r BaseRepo) Delete(ctx context.Context, id int64) error {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.TableName,
-				"id":    id,
-			}).Error("Cannot build sql query for delete", err)
-		return err
+		slog.ErrorContext(ctx, "Cannot build SQL query for delete",
+			slog.Any("error", err),
+			slog.String("table", r.TableName),
+			slog.String("sql", sql),
+			slog.Any("id", id),
+		)
 	}
 
 	err = r.DB.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.TableName,
-				"id":    id,
-			}).Error("Cannot exec delete", err)
-		return err
+		slog.ErrorContext(ctx, "Error during exec query for delete",
+			slog.Any("error", err),
+			slog.String("table", r.TableName),
+			slog.Any("id", id),
+		)
 	}
 
 	if r.Index != nil {
 		err = r.Index.Delete(strconv.Itoa(int(id)))
 		if err != nil {
-			logrus.WithContext(ctx).
-				WithFields(logrus.Fields{
-					"table": r.TableName,
-					"id":    id,
-				}).Error("Cannot delete search index", err)
+			slog.ErrorContext(ctx, "Cannot delete search index",
+				slog.Any("error", err),
+				slog.String("table", r.TableName),
+				slog.Any("id", id),
+			)
 		}
 	}
 
@@ -83,23 +82,22 @@ func (r BaseRepo) BulkUpdate(ctx context.Context, updateFields, where map[string
 	sql, args, err := ds.ToSQL()
 
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table":  r.TableName,
-				"update": updateFields,
-				"where":  where,
-			}).Error("Cannot build sql query for bulk update", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for bulk update",
+			slog.Any("error", err),
+			slog.String("table", r.TableName),
+			slog.String("sql", sql),
+		)
 		return err
 	}
 
 	err = r.DB.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table":  r.TableName,
-				"update": updateFields,
-				"where":  where,
-			}).Error("Cannot exec bulk update", err)
+		slog.ErrorContext(ctx, "Error during exec query for bulk update",
+			slog.Any("error", err),
+			slog.String("table", r.TableName),
+			slog.Any("update", updateFields),
+			slog.Any("where", where),
+		)
 		return err
 	}
 

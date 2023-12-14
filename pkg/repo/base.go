@@ -2,11 +2,11 @@ package repo
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
-	"github.com/sirupsen/logrus"
 
 	"github.com/EveryHotel/core-tools/pkg/database"
 )
@@ -84,22 +84,22 @@ func (r *baseRepo[T, ID]) BulkUpdate(ctx context.Context, updateFields, where ma
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"sql":   sql,
-			}).Error("Cannot build SQL query for bulk update", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for bulk update",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return err
 	}
 
 	err = r.db.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table":  r.tableName,
-				"update": updateFields,
-				"where":  where,
-			}).Error("Error during exec query for bulk update", err)
+		slog.ErrorContext(ctx, "Error during exec query for bulk update",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("update", updateFields),
+			slog.Any("where", where),
+		)
 		return err
 	}
 
@@ -118,21 +118,21 @@ func (r *baseRepo[T, ID]) Create(ctx context.Context, entity T) (ID, error) {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"sql":   sql,
-			}).Error("Cannot build Sql query for insert", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for insert",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return id, err
 	}
 
 	err = r.db.Insert(ctx, sql, args, &id)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"data":  rows,
-			}).Error("Error during exec insert", err)
+		slog.ErrorContext(ctx, "Error during exec insert",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("rows", rows),
+		)
 		return id, err
 	}
 
@@ -149,23 +149,23 @@ func (r *baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-				"sql":   sql,
-			}).Error("cannot build SQL query for update", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for update",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("id", id),
+			slog.String("sql", sql),
+		)
 		return err
 	}
 
 	err = r.db.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-				"data":  rows,
-			}).Error("Error during exec update", err)
+		slog.ErrorContext(ctx, "Error during exec update",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("id", id),
+			slog.Any("data", rows),
+		)
 		return err
 	}
 
@@ -184,21 +184,19 @@ func (r *baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-				"sql":   sql,
-			}).Error("Cannot build sql query for select", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return entity, err
 	}
 
 	if err = r.db.SelectOne(ctx, sql, args, &entity); err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-			}).Error("Error during exec select", err)
+		slog.ErrorContext(ctx, "Error during exec select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+		)
 		return entity, err
 	}
 
@@ -215,20 +213,20 @@ func (r *baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]in
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"sql":   sql,
-			}).Error("Cannot build sql query for select", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return entity, err
 	}
 
 	if err = r.db.SelectOne(ctx, sql, args, &entity); err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table":      r.tableName,
-				"conditions": conditions,
-			}).Error("Error during exec select", err)
+		slog.ErrorContext(ctx, "Error during exec select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("conditions", conditions),
+		)
 		return entity, err
 	}
 
@@ -244,19 +242,19 @@ func (r *baseRepo[T, ID]) List(ctx context.Context) ([]T, error) {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"sql":   sql,
-			}).Error("Cannot build sql query for select", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return res, err
 	}
 
 	if err = r.db.Select(ctx, sql, args, &res); err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-			}).Error("Error during exec select", err)
+		slog.ErrorContext(ctx, "Error during exec select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+		)
 		return res, err
 	}
 
@@ -293,20 +291,20 @@ func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interf
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"sql":   sql,
-			}).Error("Cannot build sql query for select", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return res, err
 	}
 
 	if err = r.db.Select(ctx, sql, args, &res); err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table":      r.tableName,
-				"conditions": criteria,
-			}).Error("Error during exec select", err)
+		slog.ErrorContext(ctx, "Error during exec select",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("criteria", criteria),
+		)
 		return res, err
 	}
 
@@ -331,22 +329,22 @@ func (r *baseRepo[T, ID]) ForceDelete(ctx context.Context, id ID) error {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-				"sql":   sql,
-			}).Error("Cannot build sql query for delete", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
+
 		return err
 	}
 
 	err = r.db.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-			}).Error("Error during exec delete", err)
+		slog.ErrorContext(ctx, "Error during exec delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("id", id),
+		)
 		return err
 	}
 
@@ -363,22 +361,22 @@ func (r *baseRepo[T, ID]) SoftDelete(ctx context.Context, id ID) error {
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-				"sql":   sql,
-			}).Error("Cannot build sql query for delete", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for soft delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+			slog.Any("id", id),
+		)
 		return err
 	}
 
 	err = r.db.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"id":    id,
-			}).Error("Error during soft exec delete", err)
+		slog.ErrorContext(ctx, "Error during exec soft delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("id", id),
+		)
 		return err
 	}
 
@@ -402,22 +400,22 @@ func (r *baseRepo[T, ID]) CreateMultiple(ctx context.Context, entities []T) ([]I
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"sql":   sql,
-			}).Error("Cannot build sql query for multiple insert", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for multiple insert",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return nil, err
 	}
 
 	var res []ID
 	err = r.db.InsertMany(ctx, sql, args, &res)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table":  r.tableName,
-				"values": records,
-			}).Error("Cannot exec multiple insert", err)
+		slog.ErrorContext(ctx, "Error during exec multiple insert",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("values", records),
+		)
 		return nil, err
 	}
 
@@ -457,21 +455,21 @@ func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) erro
 	sql, args, err := ds.ToSQL()
 
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"sql":   sql,
-			}).Error("Cannot build sql query for multiple update", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for multiple update",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return err
 	}
 
 	err = r.db.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table":  r.tableName,
-				"values": records,
-			}).Error("Cannot exec multiple update", err)
+		slog.ErrorContext(ctx, "Error during exec multiple update",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("values", records),
+		)
 		return err
 	}
 
@@ -485,22 +483,21 @@ func (r *baseRepo[T, ID]) ForceDeleteMultiple(ctx context.Context, ids []ID) err
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"ids":   ids,
-				"sql":   sql,
-			}).Error("Cannot build sql query for delete", err)
+		slog.ErrorContext(ctx, "Cannot build SQL query for multiple delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+		)
 		return err
 	}
 
 	err = r.db.Exec(ctx, sql, args)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"table": r.tableName,
-				"ids":   ids,
-			}).Error("Error during exec delete", err)
+		slog.ErrorContext(ctx, "Error during exec multiple delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("ids", ids),
+		)
 		return err
 	}
 

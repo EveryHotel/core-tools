@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -64,19 +63,36 @@ func (s *dashaMailService) Send(ctx context.Context, email EmailMessage) error {
 
 	form, contentType, err := prepareForm(params, attaches)
 	if err != nil {
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"params": params,
-			}).Error(fmt.Sprintf("cant'n form email: %v", err))
+		slog.ErrorContext(ctx, "can't form email",
+			slog.Any("error", err),
+			slog.Group("params",
+				slog.String("method", "transactional.send"),
+				slog.String("api_key", s.apiKey),
+				slog.String("from_email", email.From.Mail),
+				slog.String("to", strings.Join(toEmails, ",")),
+				slog.String("subject", email.Subject),
+				slog.String("message", email.Body),
+				slog.String("format", "json"),
+			),
+		)
+
 		return err
 	}
 	response, err := s.doRequest(ctx, form, contentType)
 	if err != nil {
+		slog.ErrorContext(ctx, "dashamail dorequest",
+			slog.Any("error", err))
 		return err
 	}
 	if response.Response.Msg.ErrCode > 0 {
 		err = fmt.Errorf("dashamail transaction: %s, error: %s, ", response.Response.Msg.Text, response.Response.Data.TransactionId)
-		logrus.WithContext(ctx).Error(err)
+		slog.ErrorContext(ctx, "dashamail transaction send",
+			slog.Group("response",
+				slog.String("transaction_id", response.Response.Data.TransactionId),
+				slog.String("text", response.Response.Msg.Text),
+				slog.Int("err_code", response.Response.Msg.ErrCode),
+				slog.String("type", response.Response.Msg.Type),
+			))
 		return err
 	}
 	return nil
@@ -101,10 +117,6 @@ func (s *dashaMailService) doRequest(ctx context.Context, form bytes.Buffer, for
 	if response.StatusCode < 200 || response.StatusCode > 300 {
 		defer response.Body.Close()
 		body, _ := io.ReadAll(response.Body)
-		logrus.WithContext(ctx).
-			WithFields(logrus.Fields{
-				"status": response.StatusCode,
-			}).Error(body)
 		return dashaResponse{}, errors.New(fmt.Sprintf("mail sending error statusCode: %d, %s", response.StatusCode, body))
 	}
 

@@ -17,7 +17,6 @@ require (
 	github.com/meilisearch/meilisearch-go v0.25.0
 	github.com/onsi/ginkgo/v2 v2.6.1
 	github.com/onsi/gomega v1.24.2
-	github.com/sirupsen/logrus v1.9.0
 	github.com/wagslane/go-rabbitmq v0.12.4
 	github.com/xhit/go-simple-mail/v2 v2.11.0
 )

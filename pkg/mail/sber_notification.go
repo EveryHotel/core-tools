@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	sberIdentity "github.com/EveryHotel/core-tools/pkg/sber-identity"
 )
@@ -89,9 +88,8 @@ func (s *sberMailService) Send(ctx context.Context, email EmailMessage) error {
 	if response.StatusCode < 200 || response.StatusCode > 300 {
 		defer response.Body.Close()
 		body, _ := io.ReadAll(response.Body)
-		logrus.WithContext(ctx).WithFields(logrus.Fields{
-			"status": response.StatusCode,
-		}).Error(body)
+		slog.ErrorContext(ctx, string(body),
+			slog.Int("status", response.StatusCode))
 		return errors.New(fmt.Sprintf("mail sending error statusCode: %d, %s", response.StatusCode, body))
 	}
 
