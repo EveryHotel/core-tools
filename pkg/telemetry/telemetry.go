@@ -24,6 +24,7 @@ type TelemetryParams struct {
 	SentryDSN  string
 	AppEnv     string
 	LogFile    string
+	LogLevel   slog.Level
 }
 
 var isUptrace bool
@@ -83,7 +84,7 @@ func Start(params TelemetryParams) error {
 	case "sentry":
 		logger := slog.New(slogotel.OtelHandler{
 			Next: slogsentry.Option{
-				Level:     slog.LevelError,
+				Level:     params.LogLevel,
 				AddSource: true,
 			}.NewSentryHandler(),
 			AddSource: true,
