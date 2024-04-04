@@ -25,6 +25,7 @@ type BaseRepo[T any, ID int64 | string] interface {
 	CreateMultiple(context.Context, []T) ([]ID, error)
 	UpdateMultiple(context.Context, []T) error
 	ForceDeleteMultiple(context.Context, []ID) error
+	DeleteAndMoveReferences(ctx context.Context, id ID, newId ID) error
 }
 
 type baseRepo[T any, ID int64 | string] struct {
@@ -502,4 +503,9 @@ func (r *baseRepo[T, ID]) ForceDeleteMultiple(ctx context.Context, ids []ID) err
 	}
 
 	return nil
+}
+
+// DeleteAndMoveReferences необходимо переопределить в репозитории, если необходимо перемещать ссылки
+func (r *baseRepo[T, ID]) DeleteAndMoveReferences(ctx context.Context, id ID, newId ID) error {
+	return r.Delete(ctx, id)
 }
