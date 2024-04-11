@@ -187,3 +187,7 @@ func (r *indexableBaseRepo[I, E, ID]) Delete(ctx context.Context, id ID) error {
 
 	return nil
 }
+
+func (r *indexableBaseRepo[I, E, ID]) DeleteAndMoveReferences(ctx context.Context, id ID, newId ID) error {
+	return r.Delete(ctx, id)
+}
