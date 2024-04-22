@@ -58,6 +58,22 @@ func (s *fileService) Upload(ctx context.Context, storageName string, uploadPref
 	ext := path.Ext(realName)
 	if ext != "" {
 		mimeType = mime.TypeByExtension(ext)
+		if mimeType == "" {
+			switch ext {
+			case ".docx":
+				mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+			case ".xlsx":
+				mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+			case ".pptx":
+				mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+			case ".doc":
+				mimeType = "application/msword"
+			case ".xls":
+				mimeType = "application/vnd.ms-excel"
+			case ".ppt":
+				mimeType = "application/vnd.ms-powerpoint"
+			}
+		}
 	}
 
 	uploadedPath, size, err := s.UploadWithFileName(ctx, storageName, uploadPrefix, filepath, mimeType, file)
