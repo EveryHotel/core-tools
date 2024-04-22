@@ -28,10 +28,11 @@ type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface 
 
 type indexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] struct {
 	BaseRepo[E, ID]
-	meili     meilisearch.MeiliService
-	indexName string
-	alias     string
-	setId     func(ptr *E, id ID)
+	meili          meilisearch.MeiliService
+	indexName      string
+	alias          string
+	setId          func(ptr *E, id ID)
+	indexRelations []ListOptionRelation
 }
 
 func NewIndexableRepository[I any, E IndexableModel[I], ID int64 | string](
@@ -39,13 +40,15 @@ func NewIndexableRepository[I any, E IndexableModel[I], ID int64 | string](
 	meili meilisearch.MeiliService,
 	indexName, tableName, alias, idColumn string,
 	setId func(ptr *E, id ID),
+	indexRelations []ListOptionRelation,
 ) IndexableBaseRepo[I, E, ID] {
 	return &indexableBaseRepo[I, E, ID]{
-		BaseRepo:  NewRepository[E, ID](db, tableName, alias, idColumn),
-		meili:     meili,
-		indexName: indexName,
-		alias:     alias,
-		setId:     setId,
+		BaseRepo:       NewRepository[E, ID](db, tableName, alias, idColumn),
+		meili:          meili,
+		indexName:      indexName,
+		alias:          alias,
+		setId:          setId,
+		indexRelations: indexRelations,
 	}
 }
 
@@ -145,7 +148,16 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 	sortRule := WithSort([]exp.OrderedExpression{goqu.I(r.alias + ".id").Asc()})
 
 	for {
-		items, err := r.ListBy(ctx, criteria, WithLimit(limit), WithOffset(offset), sortRule)
+		opts := []ListOption{
+			WithLimit(limit),
+			WithOffset(offset),
+			sortRule,
+		}
+		if r.indexRelations != nil {
+			opts = append(opts, WithRelations(r.indexRelations))
+		}
+
+		items, err := r.ListBy(ctx, criteria, opts...)
 		if err != nil {
 			return err
 		}

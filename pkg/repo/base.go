@@ -67,14 +67,28 @@ func WithSort(sort []exp.OrderedExpression) ListOption {
 	}
 }
 
+func WithRelations(relations []ListOptionRelation) ListOption {
+	return func(handler *ListOptionHandler) {
+		handler.Relations = relations
+	}
+}
+
 func NewListOptionHandler() *ListOptionHandler {
 	return &ListOptionHandler{}
 }
 
 type ListOptionHandler struct {
-	Limit  int64
-	Offset int64
-	Sort   []exp.OrderedExpression
+	Limit     int64
+	Offset    int64
+	Sort      []exp.OrderedExpression
+	Relations []ListOptionRelation
+}
+
+type ListOptionRelation struct {
+	Alias       string
+	Table       string
+	Expressions []exp.Expression
+	Nullable    bool
 }
 
 // BulkUpdate обновляет записи в таблице по заданному условию
@@ -271,8 +285,25 @@ func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interf
 		opt(optHandler)
 	}
 
-	ds := goqu.Select(database.Sanitize(*new(T), database.WithPrefix(r.alias))...).
+	var relations []string
+	if len(optHandler.Relations) > 0 {
+		for _, r := range optHandler.Relations {
+			relations = append(relations, r.Alias)
+		}
+	}
+
+	ds := goqu.Select(database.Sanitize(*new(T), database.WithPrefix(r.alias), database.WithRelations(relations...))...).
 		From(database.GetTableName(r.tableName).As(r.alias))
+
+	if len(optHandler.Relations) > 0 {
+		for _, r := range optHandler.Relations {
+			if r.Nullable {
+				ds = ds.LeftJoin(database.GetTableName(r.Table).As(r.Alias), goqu.On(r.Expressions...))
+			} else {
+				ds = ds.InnerJoin(database.GetTableName(r.Table).As(r.Alias), goqu.On(r.Expressions...))
+			}
+		}
+	}
 
 	if len(criteria) > 0 {
 		ds = ds.Where(goqu.Ex(criteria))
@@ -300,7 +331,7 @@ func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interf
 		return res, err
 	}
 
-	if err = r.db.Select(ctx, sql, args, &res); err != nil {
+	if err = r.db.Select(ctx, sql, args, &res, relations...); err != nil {
 		slog.ErrorContext(ctx, "Error during exec select",
 			slog.Any("error", err),
 			slog.String("table", r.tableName),
