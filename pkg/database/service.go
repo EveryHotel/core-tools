@@ -184,13 +184,13 @@ func scanRows(rows pgx.Rows, dest any, relations ...string) error {
 	nullable := DestHasNullableRelations(reflect.New(reflect.TypeOf(dest).Elem().Elem()).Elem(), relations...)
 
 	var nullableRow, scanFields []any
-	// создаем nullableRow, куда будет происходить скан
-	if nullable {
-		nullableRow = GetNullableRowFromOrigDest(reflect.New(reflect.TypeOf(dest).Elem().Elem()).Elem(), false, relations...)
-		scanFields = SetNullableDestFields(reflect.ValueOf(nullableRow), []any{})
-	}
 
 	for rows.Next() {
+		// создаем nullableRow, куда будет происходить скан
+		if nullable {
+			nullableRow = GetNullableRowFromOrigDest(reflect.New(reflect.TypeOf(dest).Elem().Elem()).Elem(), false, relations...)
+			scanFields = SetNullableDestFields(reflect.ValueOf(nullableRow), []any{})
+		}
 		// reflect.TypeOf(dest) это указатель
 		// первый Elem() разыименовывает его, второй Elem() получает типо элемента в slice
 		destItem := reflect.New(reflect.TypeOf(dest).Elem().Elem()).Elem()
