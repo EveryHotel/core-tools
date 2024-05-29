@@ -13,7 +13,7 @@ import (
 type StorageService interface {
 	Save(path string, mimeType string, file io.Reader) (int64, error)
 	Get(path string) (io.ReadCloser, error)
-	Delete(path string) error
+	Delete(path string, recursive bool) error
 	List() ([]string, error)
 	GetUrl(path string) (string, error)
 }
@@ -23,7 +23,7 @@ type StorageManagerService interface {
 	UploadWithFileName(ctx context.Context, storageName, uploadPrefix, fileName, mimeType string, file io.Reader) (string, int64, error)
 	GetUrl(storageName string, path string) (string, error)
 	Get(storageName string, path string) (io.ReadCloser, error)
-	Delete(storageName string, path string) error
+	Delete(storageName string, path string, recursive bool) error
 	ListFiles(storageName string) ([]string, error)
 }
 
@@ -127,13 +127,13 @@ func (s *fileService) Get(storageName string, path string) (io.ReadCloser, error
 }
 
 // Delete - удаляет файл в хранилище
-func (s *fileService) Delete(storageName string, path string) error {
+func (s *fileService) Delete(storageName string, path string, recursive bool) error {
 	storageService, ok := s.storages[storageName]
 	if ok != true {
 		return fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
 	}
 
-	return storageService.Delete(path)
+	return storageService.Delete(path, recursive)
 }
 
 // ListFiles - выводит список файлов в хранилище

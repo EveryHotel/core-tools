@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"path"
@@ -92,14 +93,52 @@ func (s *s3Storage) GetUrl(file string) (string, error) {
 	return u.String(), nil
 }
 
-func (s *s3Storage) Delete(path string) error {
-	deleteInput := &s3.DeleteObjectInput{
-		Key:    aws.String(path),
-		Bucket: aws.String(s.bucket),
-	}
-	_, err := s3.New(s.s3Session).DeleteObject(deleteInput)
+func (s *s3Storage) Delete(path string, recursive bool) (err error) {
+	client := s3.New(s.s3Session)
+	if recursive {
+		if path[len(path)-1] != '/' {
+			path += "/"
+		}
+		input := &s3.ListObjectsInput{
+			Bucket: aws.String(s.bucket),
+			Prefix: aws.String(path),
+		}
+		objects, err := client.ListObjects(input)
+		if err != nil {
+			return fmt.Errorf("list objects: %w", err)
+		}
 
-	return err
+		if len(objects.Contents) == 0 {
+			return nil
+		}
+
+		var objectIds []*s3.ObjectIdentifier
+		for _, obj := range objects.Contents {
+			objectIds = append(objectIds, &s3.ObjectIdentifier{Key: obj.Key})
+		}
+		deleteInput := s3.DeleteObjectsInput{
+			Bucket: aws.String(s.bucket),
+			Delete: &s3.Delete{
+				Objects: objectIds,
+			},
+		}
+
+		_, err = client.DeleteObjects(&deleteInput)
+		if err != nil {
+			return fmt.Errorf("delete objects: %w", err)
+		}
+	} else {
+		deleteInput := &s3.DeleteObjectInput{
+			Key:    aws.String(path),
+			Bucket: aws.String(s.bucket),
+		}
+		_, err = client.DeleteObject(deleteInput)
+		if err != nil {
+			return fmt.Errorf("delete object: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *s3Storage) List() ([]string, error) {

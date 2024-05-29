@@ -57,13 +57,17 @@ func (s *localStorage) Get(path string) (io.ReadCloser, error) {
 	return f, nil
 }
 
-func (s *localStorage) Delete(path string) error {
+func (s *localStorage) Delete(path string, recursive bool) error {
 	apath, err := s.getAbsolute(path)
 	if err != nil {
 		return err
 	}
 
-	return os.Remove(apath)
+	if recursive {
+		return os.RemoveAll(apath)
+	} else {
+		return os.Remove(apath)
+	}
 }
 
 func (s *localStorage) List() ([]string, error) {
