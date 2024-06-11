@@ -20,6 +20,7 @@ type BaseRepo[T any, ID int64 | string] interface {
 	ForceDelete(context.Context, ID) error
 	List(context.Context) ([]T, error)
 	ListBy(context.Context, map[string]interface{}, ...ListOption) ([]T, error)
+	ListByExpression(context.Context, exp.ExpressionList, ...ListOption) ([]T, error)
 	SoftDelete(context.Context, ID) error
 	Update(context.Context, T) error
 	CreateMultiple(context.Context, []T) ([]ID, error)
@@ -278,6 +279,12 @@ func (r *baseRepo[T, ID]) List(ctx context.Context) ([]T, error) {
 
 // ListBy возвращает список сущностей по критерию
 func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interface{}, options ...ListOption) ([]T, error) {
+	expression := goqu.And(goqu.Ex(criteria))
+	return r.ListByExpression(ctx, expression, options...)
+}
+
+// ListByExpression возвращает список сущностей по выражению
+func (r *baseRepo[T, ID]) ListByExpression(ctx context.Context, criteria exp.ExpressionList, options ...ListOption) ([]T, error) {
 	var res []T
 
 	optHandler := NewListOptionHandler()
@@ -305,8 +312,8 @@ func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interf
 		}
 	}
 
-	if len(criteria) > 0 {
-		ds = ds.Where(goqu.Ex(criteria))
+	if !criteria.IsEmpty() {
+		ds = ds.Where(criteria)
 	}
 
 	if len(optHandler.Sort) > 0 {
