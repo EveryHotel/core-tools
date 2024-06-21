@@ -61,4 +61,5 @@ type DefaultConfig struct {
 	AppName  string
 	BaseUrl  string
 	FromMail string
+	Extra    map[string]any
 }
