@@ -22,6 +22,7 @@ type BaseRepo[T any, ID int64 | string] interface {
 	ListBy(context.Context, map[string]interface{}, ...ListOption) ([]T, error)
 	ListByExpression(context.Context, exp.ExpressionList, ...ListOption) ([]T, error)
 	SoftDelete(context.Context, ID) error
+	SoftDeleteMultiple(context.Context, []ID) error
 	Update(context.Context, T) error
 	CreateMultiple(context.Context, []T) ([]ID, error)
 	UpdateMultiple(context.Context, []T) error
@@ -415,6 +416,38 @@ func (r *baseRepo[T, ID]) SoftDelete(ctx context.Context, id ID) error {
 			slog.Any("error", err),
 			slog.String("table", r.tableName),
 			slog.Any("id", id),
+		)
+		return err
+	}
+
+	return nil
+}
+
+// SoftDeleteMultiple помечает пачку сущностей, как удаленные
+func (r *baseRepo[T, ID]) SoftDeleteMultiple(ctx context.Context, ids []ID) error {
+	ds := goqu.Update(r.tableName).
+		Where(goqu.C(r.idColumn).In(ids)).
+		Set(goqu.Record{
+			"deleted_at": time.Now(),
+		})
+
+	sql, args, err := ds.ToSQL()
+	if err != nil {
+		slog.ErrorContext(ctx, "Cannot build SQL query for multiple soft delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.String("sql", sql),
+			slog.Any("ids", ids),
+		)
+		return err
+	}
+
+	err = r.db.Exec(ctx, sql, args)
+	if err != nil {
+		slog.ErrorContext(ctx, "Error during exec multiple soft delete",
+			slog.Any("error", err),
+			slog.String("table", r.tableName),
+			slog.Any("ids", ids),
 		)
 		return err
 	}
