@@ -10,6 +10,7 @@ import (
 	slogotel "github.com/DmitryKolbin/slog-otel"
 	"github.com/getsentry/sentry-go"
 	"github.com/getsentry/sentry-go/otel"
+	slogmulti "github.com/samber/slog-multi"
 	slogsentry "github.com/samber/slog-sentry/v2"
 	"github.com/uptrace/uptrace-go/uptrace"
 	"go.opentelemetry.io/otel"
@@ -19,7 +20,7 @@ import (
 
 type TelemetryParams struct {
 	AppName    string
-	LogEngine  string
+	LogEngines []string
 	UptraceDSN string
 	SentryDSN  string
 	AppEnv     string
@@ -80,32 +81,39 @@ func Start(params TelemetryParams) error {
 		otel.SetTextMapPropagator(sentryotel.NewSentryPropagator())
 	}
 
-	switch params.LogEngine {
-	case "sentry":
-		logger := slog.New(slogotel.OtelHandler{
-			Next: slogsentry.Option{
-				Level:     params.LogLevel,
-				AddSource: true,
-			}.NewSentryHandler(),
-			AddSource: true,
-		})
-		logger = logger.
-			With("environment", params.AppEnv)
-		slog.SetDefault(logger)
-	case "file":
-		logfile, err := os.OpenFile(params.LogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
-		if err != nil {
-			return fmt.Errorf("can't open log file: %w", err)
+	var logHandlers []slog.Handler
+	for _, engine := range params.LogEngines {
+		switch engine {
+		case "sentry":
+			if isSentry {
+				logHandlers = append(logHandlers, slogotel.OtelHandler{
+					Next: slogsentry.Option{
+						Level:     slog.LevelError,
+						AddSource: true,
+					}.NewSentryHandler(),
+					AddSource: true,
+				})
+			}
+		case "json":
+			logHandlers = append(logHandlers, slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{}))
+		case "text":
+			logHandlers = append(logHandlers, slog.NewTextHandler(os.Stdout, nil))
+		case "file":
+			logfile, err := os.OpenFile(params.LogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+			if err != nil {
+				return fmt.Errorf("can't open log file: %w", err)
+			}
+			logHandlers = append(logHandlers, slog.NewTextHandler(logfile, nil))
 		}
-		slog.SetDefault(slog.New(slogotel.OtelHandler{
-			Next:      slog.NewTextHandler(logfile, nil),
-			AddSource: true,
-		}))
-	default:
-		slog.SetDefault(slog.New(slogotel.OtelHandler{
-			Next:      slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{}),
-			AddSource: true,
-		}))
+	}
+	if len(logHandlers) > 0 {
+		slog.SetDefault(slog.New(slogmulti.Fanout(logHandlers...)).
+			With(
+				slog.String("environment", params.AppEnv),
+				slog.String("env", params.AppEnv),
+				slog.String("app", params.AppName),
+			),
+		)
 	}
 
 	return nil
