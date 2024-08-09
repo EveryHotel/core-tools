@@ -8,6 +8,7 @@ import (
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
+	meili "github.com/meilisearch/meilisearch-go"
 
 	"github.com/EveryHotel/core-tools/pkg/database"
 	"github.com/EveryHotel/core-tools/pkg/meilisearch"
@@ -24,6 +25,7 @@ type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface 
 	GetValue(id ID) (I, error)
 	SearchByTerm(string) ([]I, error)
 	UpdateIndex(ctx context.Context, entity E) error
+	MultipleSearch(requests []meili.SearchRequest) ([][]I, error)
 }
 
 type indexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] struct {
@@ -33,6 +35,7 @@ type indexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] struct {
 	alias          string
 	setId          func(ptr *E, id ID)
 	indexRelations []ListOptionRelation
+	meiliSettings  *meili.Settings
 }
 
 func NewIndexableRepository[I any, E IndexableModel[I], ID int64 | string](
@@ -41,6 +44,7 @@ func NewIndexableRepository[I any, E IndexableModel[I], ID int64 | string](
 	indexName, tableName, alias, idColumn string,
 	setId func(ptr *E, id ID),
 	indexRelations []ListOptionRelation,
+	meiSettings *meili.Settings,
 ) IndexableBaseRepo[I, E, ID] {
 	return &indexableBaseRepo[I, E, ID]{
 		BaseRepo:       NewRepository[E, ID](db, tableName, alias, idColumn),
@@ -49,6 +53,7 @@ func NewIndexableRepository[I any, E IndexableModel[I], ID int64 | string](
 		alias:          alias,
 		setId:          setId,
 		indexRelations: indexRelations,
+		meiliSettings:  meiSettings,
 	}
 }
 
@@ -96,6 +101,35 @@ func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string) ([]I, error) {
 	return res, nil
 }
 
+func (r *indexableBaseRepo[I, E, ID]) MultipleSearch(requests []meili.SearchRequest) ([][]I, error) {
+	for i := range requests {
+		requests[i].IndexUID = r.indexName
+	}
+
+	items, err := r.meili.MultipleSearchDocuments(requests)
+	if err != nil {
+		return nil, err
+	}
+
+	var res [][]I
+	for _, val := range items {
+		var resItems []I
+		//TODO: временное решение, чтобы преобразовывать в нужный тип
+		encoded, err := json.Marshal(val)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = json.Unmarshal(encoded, &resItems); err != nil {
+			return nil, err
+		}
+
+		res = append(res, resItems)
+	}
+
+	return res, nil
+}
+
 func (r *indexableBaseRepo[I, E, ID]) GetValue(id ID) (I, error) {
 	var item I
 
@@ -115,7 +149,7 @@ func (r *indexableBaseRepo[I, E, ID]) UpdateIndex(ctx context.Context, entity E)
 		return nil
 	}
 
-	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex()); err != nil {
+	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex(), r.meiliSettings); err != nil {
 		slog.ErrorContext(ctx, "update document error",
 			slog.Any("error", err),
 			slog.String("index", r.indexName),
@@ -171,7 +205,7 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 			data = append(data, item.GetModelIndex())
 		}
 
-		if err = r.meili.AddDocuments(r.indexName, data); err != nil {
+		if err = r.meili.AddDocuments(r.indexName, data, r.meiliSettings); err != nil {
 			return err
 		}
 
