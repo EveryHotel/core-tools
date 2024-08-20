@@ -4,6 +4,8 @@ import (
 	"reflect"
 
 	"github.com/go-ozzo/ozzo-validation/v4"
+
+	"github.com/EveryHotel/core-tools/pkg/types"
 )
 
 // Nested хэлпер для применения валидации вложенных структур
@@ -21,4 +23,18 @@ func Nested(target interface{}, fieldRules ...*validation.FieldRules) *validatio
 
 		return validation.ValidateStruct(target, fieldRules...)
 	}))
+}
+
+// OmitOrNotEmpty поле либо не представлено в запросе, либо должно быть заполнено
+func OmitOrNotEmpty[T any](value interface{}) error {
+	val, ok := value.(types.Omitempty[T])
+	if !ok || !val.Valid {
+		return nil
+	}
+
+	if validation.IsEmpty(val.Value) {
+		return validation.ErrRequired
+	}
+
+	return nil
 }
