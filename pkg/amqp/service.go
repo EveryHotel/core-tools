@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"encoding/json"
+	"log/slog"
 
 	"github.com/wagslane/go-rabbitmq"
 )
@@ -11,6 +12,7 @@ type AmqpService interface {
 	Publish(Task, []string) error
 	Serve() error
 	Close() error
+	SetLogLevel(slog.Level)
 }
 
 type amqpService struct {
@@ -20,6 +22,7 @@ type amqpService struct {
 	consumers         []ConsumerService
 	connection        *rabbitmq.Conn
 	internalConsumers []*rabbitmq.Consumer
+	logLevel          slog.Level
 }
 
 func NewAmqpService(amqpUrl string, exchangeName, exchangeType string) AmqpService {
@@ -27,7 +30,12 @@ func NewAmqpService(amqpUrl string, exchangeName, exchangeType string) AmqpServi
 		amqpUrl:      amqpUrl,
 		exchangeName: exchangeName,
 		exchangeType: exchangeType,
+		logLevel:     slog.LevelWarn,
 	}
+}
+
+func (s *amqpService) SetLogLevel(level slog.Level) {
+	s.logLevel = level
 }
 
 // AddConsumer добавляет новый обработчик сообщений
@@ -52,6 +60,7 @@ func (s *amqpService) Publish(task Task, routingKeys []string) error {
 		rabbitmq.WithPublisherOptionsExchangeName(s.exchangeName),
 		rabbitmq.WithPublisherOptionsExchangeDeclare,
 		rabbitmq.WithPublisherOptionsExchangeDurable,
+		rabbitmq.WithPublisherOptionsLogger(NewLogger(s.logLevel)),
 	)
 	if err != nil {
 		return err
@@ -119,6 +128,7 @@ func (s *amqpService) runConsumer(consumerService ConsumerService) error {
 		rabbitmq.WithConsumerOptionsQueueDurable,
 		rabbitmq.WithConsumerOptionsExchangeDurable,
 		rabbitmq.WithConsumerOptionsConcurrency(consumerService.GetConcurrency()),
+		rabbitmq.WithConsumerOptionsLogger(NewLogger(s.logLevel)),
 	}
 
 	for _, routing := range consumerService.GetRoutingKeys() {
