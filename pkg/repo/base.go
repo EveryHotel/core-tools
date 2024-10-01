@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
@@ -147,8 +148,13 @@ func (r *baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
 
 // Get возвращает сущность по id
 func (r *baseRepo[T, ID]) Get(ctx context.Context, id ID, relations ...ListOptionRelation) (T, error) {
+	idCondKey := r.idColumn
+	// если в idColumn только наименование колонки, то добавляем префикс
+	if !strings.Contains(idCondKey, ".") {
+		idCondKey = r.alias + "." + idCondKey
+	}
 	return r.GetOneBy(ctx, map[string]any{
-		r.idColumn: id,
+		idCondKey: id,
 	}, relations...)
 }
 
