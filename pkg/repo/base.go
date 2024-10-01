@@ -12,14 +12,14 @@ import (
 )
 
 type BaseRepo[T any, ID int64 | string] interface {
-	BulkUpdate(context.Context, map[string]interface{}, map[string]interface{}) error
+	BulkUpdate(context.Context, map[string]any, map[string]any) error
 	Create(context.Context, T) (ID, error)
 	Delete(context.Context, ID) error
-	Get(context.Context, ID) (T, error)
-	GetOneBy(context.Context, map[string]interface{}) (T, error)
+	Get(context.Context, ID, ...ListOptionRelation) (T, error)
+	GetOneBy(context.Context, map[string]any, ...ListOptionRelation) (T, error)
 	ForceDelete(context.Context, ID) error
 	List(context.Context) ([]T, error)
-	ListBy(context.Context, map[string]interface{}, ...ListOption) ([]T, error)
+	ListBy(context.Context, map[string]any, ...ListOption) ([]T, error)
 	ListByExpression(context.Context, exp.ExpressionList, ...ListOption) ([]T, error)
 	SoftDelete(context.Context, ID) error
 	SoftDeleteMultiple(context.Context, []ID) error
@@ -39,7 +39,7 @@ type baseRepo[T any, ID int64 | string] struct {
 
 func NewRepository[T any, ID int64 | string](db database.DBService, tableName, alias, idColumn string) BaseRepo[T, ID] {
 	if idColumn == "" {
-		idColumn = "id"
+		idColumn = alias + ".id"
 	}
 	return &baseRepo[T, ID]{
 		db:        db,
@@ -49,52 +49,8 @@ func NewRepository[T any, ID int64 | string](db database.DBService, tableName, a
 	}
 }
 
-type ListOption func(handler *ListOptionHandler)
-
-func WithLimit(limit int64) ListOption {
-	return func(handler *ListOptionHandler) {
-		handler.Limit = limit
-	}
-}
-
-func WithOffset(offset int64) ListOption {
-	return func(handler *ListOptionHandler) {
-		handler.Offset = offset
-	}
-}
-
-func WithSort(sort []exp.OrderedExpression) ListOption {
-	return func(handler *ListOptionHandler) {
-		handler.Sort = sort
-	}
-}
-
-func WithRelations(relations []ListOptionRelation) ListOption {
-	return func(handler *ListOptionHandler) {
-		handler.Relations = relations
-	}
-}
-
-func NewListOptionHandler() *ListOptionHandler {
-	return &ListOptionHandler{}
-}
-
-type ListOptionHandler struct {
-	Limit     int64
-	Offset    int64
-	Sort      []exp.OrderedExpression
-	Relations []ListOptionRelation
-}
-
-type ListOptionRelation struct {
-	Alias       string
-	Table       string
-	Expressions []exp.Expression
-	Nullable    bool
-}
-
 // BulkUpdate обновляет записи в таблице по заданному условию
-func (r *baseRepo[T, ID]) BulkUpdate(ctx context.Context, updateFields, where map[string]interface{}) error {
+func (r *baseRepo[T, ID]) BulkUpdate(ctx context.Context, updateFields, where map[string]any) error {
 	ds := goqu.Update(r.tableName).
 		Where(goqu.Ex(where)).
 		Set(goqu.Record(updateFields))
@@ -190,43 +146,26 @@ func (r *baseRepo[T, ID]) Update(ctx context.Context, entity T) error {
 }
 
 // Get возвращает сущность по id
-func (r *baseRepo[T, ID]) Get(ctx context.Context, id ID) (T, error) {
-	var entity T
-
-	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
-		From(database.GetTableName(r.tableName).As(r.alias)).
-		Where(goqu.Ex{
-			r.idColumn: id,
-		})
-
-	sql, args, err := ds.ToSQL()
-	if err != nil {
-		slog.ErrorContext(ctx, "Cannot build SQL query for select",
-			slog.Any("error", err),
-			slog.String("table", r.tableName),
-			slog.String("sql", sql),
-		)
-		return entity, err
-	}
-
-	if err = r.db.SelectOne(ctx, sql, args, &entity); err != nil {
-		slog.ErrorContext(ctx, "Error during exec select",
-			slog.Any("error", err),
-			slog.String("table", r.tableName),
-		)
-		return entity, err
-	}
-
-	return entity, nil
+func (r *baseRepo[T, ID]) Get(ctx context.Context, id ID, relations ...ListOptionRelation) (T, error) {
+	return r.GetOneBy(ctx, map[string]any{
+		r.idColumn: id,
+	}, relations...)
 }
 
 // GetOneBy возвращает сущность по указанным параметрам
-func (r *baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]interface{}) (T, error) {
+func (r *baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]any, relations ...ListOptionRelation) (T, error) {
 	var entity T
 
-	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias))...).
+	var relationAliases []string
+	for _, r := range relations {
+		relationAliases = append(relationAliases, r.Alias)
+	}
+
+	ds := goqu.Select(database.Sanitize(entity, database.WithPrefix(r.alias), database.WithRelations(relationAliases...))...).
 		From(database.GetTableName(r.tableName).As(r.alias)).
 		Where(goqu.Ex(conditions))
+
+	ds = applyRelations(ds, relations)
 
 	sql, args, err := ds.ToSQL()
 	if err != nil {
@@ -238,7 +177,7 @@ func (r *baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]in
 		return entity, err
 	}
 
-	if err = r.db.SelectOne(ctx, sql, args, &entity); err != nil {
+	if err = r.db.SelectOne(ctx, sql, args, &entity, relationAliases...); err != nil {
 		slog.ErrorContext(ctx, "Error during exec select",
 			slog.Any("error", err),
 			slog.String("table", r.tableName),
@@ -279,7 +218,7 @@ func (r *baseRepo[T, ID]) List(ctx context.Context) ([]T, error) {
 }
 
 // ListBy возвращает список сущностей по критерию
-func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]interface{}, options ...ListOption) ([]T, error) {
+func (r *baseRepo[T, ID]) ListBy(ctx context.Context, criteria map[string]any, options ...ListOption) ([]T, error) {
 	expression := goqu.And(goqu.Ex(criteria))
 	return r.ListByExpression(ctx, expression, options...)
 }
@@ -303,15 +242,7 @@ func (r *baseRepo[T, ID]) ListByExpression(ctx context.Context, criteria exp.Exp
 	ds := goqu.Select(database.Sanitize(*new(T), database.WithPrefix(r.alias), database.WithRelations(relations...))...).
 		From(database.GetTableName(r.tableName).As(r.alias))
 
-	if len(optHandler.Relations) > 0 {
-		for _, r := range optHandler.Relations {
-			if r.Nullable {
-				ds = ds.LeftJoin(database.GetTableName(r.Table).As(r.Alias), goqu.On(r.Expressions...))
-			} else {
-				ds = ds.InnerJoin(database.GetTableName(r.Table).As(r.Alias), goqu.On(r.Expressions...))
-			}
-		}
-	}
+	ds = applyRelations(ds, optHandler.Relations)
 
 	if !criteria.IsEmpty() {
 		ds = ds.Where(criteria)
@@ -461,7 +392,7 @@ func (r *baseRepo[T, ID]) CreateMultiple(ctx context.Context, entities []T) ([]I
 		return nil, nil
 	}
 
-	var records []interface{}
+	var records []any
 	for _, entity := range entities {
 		_, rows := SanitizeRowsForInsert[ID](entity)
 		records = append(records, rows)
@@ -496,7 +427,7 @@ func (r *baseRepo[T, ID]) CreateMultiple(ctx context.Context, entities []T) ([]I
 
 // UpdateMultiple обновляет несколько сущностей
 func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) error {
-	var records []interface{}
+	var records []any
 	var columns []string
 	for _, entity := range entities {
 		id, rows := SanitizeRowsForUpdateMultiple[ID](entity)
@@ -511,7 +442,7 @@ func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) erro
 		records = append(records, rows)
 
 	}
-	onConflictUpdate := make(map[string]interface{})
+	onConflictUpdate := make(map[string]any)
 	for _, column := range columns {
 		onConflictUpdate[column] = goqu.C(column).Table("excluded")
 	}
@@ -579,4 +510,16 @@ func (r *baseRepo[T, ID]) ForceDeleteMultiple(ctx context.Context, ids []ID) err
 // DeleteAndMoveReferences необходимо переопределить в репозитории, если необходимо перемещать ссылки
 func (r *baseRepo[T, ID]) DeleteAndMoveReferences(ctx context.Context, id ID, newId ID) error {
 	return r.Delete(ctx, id)
+}
+
+func applyRelations(ds *goqu.SelectDataset, relations []ListOptionRelation) *goqu.SelectDataset {
+	for _, r := range relations {
+		if r.Nullable {
+			ds = ds.LeftJoin(database.GetTableName(r.Table).As(r.Alias), goqu.On(r.Expressions...))
+		} else {
+			ds = ds.InnerJoin(database.GetTableName(r.Table).As(r.Alias), goqu.On(r.Expressions...))
+		}
+	}
+
+	return ds
 }
