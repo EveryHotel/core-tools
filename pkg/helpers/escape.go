@@ -25,7 +25,7 @@ func FilterStringToIndexFilter(filters []string) map[string]any {
 	for _, filter := range filters {
 		split := SplitWithEscaping(filter, ':', '\\')
 		if len(split) == 2 {
-			indexFilters[fmt.Sprintf("%s.keyword", split[0])] = split[1]
+			indexFilters[fmt.Sprintf("%s", split[0])] = split[1]
 		} else {
 
 			return nil

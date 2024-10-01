@@ -2,6 +2,7 @@ package meilisearch
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/meilisearch/meilisearch-go"
 )
@@ -11,7 +12,7 @@ type MeiliService interface {
 	Clear(string) error
 	DeleteDocument(string, string) error
 	GetDocument(string, string, any) error
-	SearchDocuments(indexName string, q string) ([]any, error)
+	SearchDocuments(indexName string, q string, filters map[string]any) ([]any, error)
 	MultipleSearchDocuments(requests []meilisearch.SearchRequest) ([]any, error)
 	UpdateDocuments(string, any, *meilisearch.Settings) error
 }
@@ -90,10 +91,18 @@ func (s meiliService) UpdateDocuments(indexName string, documents any, settings 
 	return nil
 }
 
-func (s meiliService) SearchDocuments(indexName string, q string) ([]any, error) {
+func (s meiliService) SearchDocuments(indexName string, q string, filters map[string]any) ([]any, error) {
 	index := s.client.Index(indexName)
+	var filter []string
+	if filters != nil {
+		for k, v := range filters {
+			filter = append(filter, fmt.Sprintf("%s = %v", k, v))
+		}
+	}
 
-	resp, err := index.Search(q, &meilisearch.SearchRequest{})
+	resp, err := index.Search(q, &meilisearch.SearchRequest{
+		Filter: filter,
+	})
 	if err != nil {
 		return nil, err
 	}
