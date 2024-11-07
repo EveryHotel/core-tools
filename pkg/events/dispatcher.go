@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+const CtxDisableDispatching = "disable_dispatching"
+
 type EventName string
 
 type Listener func(ctx context.Context, event interface{}) error
@@ -40,6 +42,11 @@ func (d *dispatcher) AddSubscriber(subscriber Subscriber) {
 }
 
 func (d *dispatcher) Dispatch(ctx context.Context, name EventName, event interface{}) error {
+	disable, ok := ctx.Value(CtxDisableDispatching).(bool)
+	if ok && disable {
+		return nil
+	}
+
 	for i, listener := range d.events[name] {
 		if err := listener(ctx, event); err != nil {
 			return fmt.Errorf("dispatch event %s with %d listener: %w", name, i, err)
