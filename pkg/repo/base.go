@@ -450,6 +450,9 @@ func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) erro
 	}
 	onConflictUpdate := make(map[string]any)
 	for _, column := range columns {
+		if column == "created_at" {
+			continue
+		}
 		onConflictUpdate[column] = goqu.C(column).Table("excluded")
 	}
 	if _, ok := onConflictUpdate["updated_at"]; ok {
