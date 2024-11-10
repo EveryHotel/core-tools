@@ -20,7 +20,7 @@ type StorageService interface {
 
 type StorageManagerService interface {
 	Upload(ctx context.Context, storageName string, uploadPrefix string, realName string, file io.Reader) (FileInfo, error)
-	UploadWithFileName(ctx context.Context, storageName, uploadPrefix, fileName, mimeType string, file io.Reader) (string, int64, error)
+	UploadWithFileName(ctx context.Context, storageName, uploadPrefix, fileName, mimeType string, file io.Reader, storagePath string) (string, int64, error)
 	GetUrl(storageName string, path string) (string, error)
 	Get(storageName string, path string) (io.ReadCloser, error)
 	Delete(storageName string, path string, recursive bool) error
@@ -76,7 +76,7 @@ func (s *fileService) Upload(ctx context.Context, storageName string, uploadPref
 		}
 	}
 
-	uploadedPath, size, err := s.UploadWithFileName(ctx, storageName, uploadPrefix, filepath, mimeType, file)
+	uploadedPath, size, err := s.UploadWithFileName(ctx, storageName, uploadPrefix, filepath, mimeType, file, "")
 	if err != nil {
 		return FileInfo{}, err
 	}
@@ -91,12 +91,16 @@ func (s *fileService) Upload(ctx context.Context, storageName string, uploadPref
 }
 
 // UploadWithFileName загружает файл в хранилище с определенным именем, перезаписывает файл при необходимости
-func (s *fileService) UploadWithFileName(ctx context.Context, storageName string, uploadPrefix string, fileName string, mimeType string, file io.Reader) (string, int64, error) {
+func (s *fileService) UploadWithFileName(ctx context.Context, storageName string, uploadPrefix string, fileName string, mimeType string, file io.Reader, storagePath string) (string, int64, error) {
 	storageService, ok := s.storages[storageName]
 	if ok != true {
 		return "", 0, fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
 	}
 	location := path.Join(uploadPrefix, fileName)
+
+	if storagePath != "" {
+		location = storagePath
+	}
 
 	size, err := storageService.Save(location, mimeType, file)
 	if err != nil {
