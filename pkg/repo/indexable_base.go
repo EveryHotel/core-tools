@@ -82,9 +82,17 @@ func (r *indexableBaseRepo[I, E, ID]) Update(ctx context.Context, entity E) erro
 }
 
 func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string, filters map[string]any) ([]I, error) {
+
 	items, err := r.meili.SearchDocuments(r.indexName, term, filters)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(items) == 0 && len(term) > 3 {
+		items, err = r.meili.SearchDocuments(r.indexName, ReplaceCorrectLang(term), filters)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var res []I
