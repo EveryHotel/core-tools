@@ -88,7 +88,7 @@ func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string, filters map[stri
 		return nil, err
 	}
 
-	if len(items) == 0 && len(term) > 3 {
+	if len(items) == 0 && len(term) >= 3 {
 		items, err = r.meili.SearchDocuments(r.indexName, ReplaceCorrectLang(term), filters)
 		if err != nil {
 			return nil, err

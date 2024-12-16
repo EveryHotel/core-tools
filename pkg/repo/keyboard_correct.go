@@ -152,7 +152,9 @@ func ReplaceCorrectLang(input string) string {
 	arrString := strings.Split(input, "")
 	var outString string
 	for _, char := range arrString {
-		outString += charMap[char]
+		if _, ok := charMap[char]; ok {
+			outString += charMap[char]
+		}
 	}
 
 	return outString
