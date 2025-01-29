@@ -12,7 +12,7 @@ type MeiliService interface {
 	Clear(string) error
 	DeleteDocument(string, string) error
 	GetDocument(string, string, any) error
-	SearchDocuments(indexName string, q string, filters map[string]any) ([]any, error)
+	SearchDocuments(indexName string, q string, filters map[string]any, limit ...int64) ([]any, error)
 	MultipleSearchDocuments(requests []meilisearch.SearchRequest) ([]any, error)
 	UpdateDocuments(string, any, *meilisearch.Settings) error
 }
@@ -91,7 +91,7 @@ func (s meiliService) UpdateDocuments(indexName string, documents any, settings 
 	return nil
 }
 
-func (s meiliService) SearchDocuments(indexName string, q string, filters map[string]any) ([]any, error) {
+func (s meiliService) SearchDocuments(indexName string, q string, filters map[string]any, limit ...int64) ([]any, error) {
 	index := s.client.Index(indexName)
 	var filter []string
 	if filters != nil {
@@ -100,8 +100,14 @@ func (s meiliService) SearchDocuments(indexName string, q string, filters map[st
 		}
 	}
 
+	var limitSearch int64
+	if len(limit) > 0 {
+		limitSearch = limit[0]
+	}
+
 	resp, err := index.Search(q, &meilisearch.SearchRequest{
 		Filter: filter,
+		Limit:  limitSearch,
 	})
 	if err != nil {
 		return nil, err

@@ -23,7 +23,7 @@ type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface 
 	BaseRepo[E, ID]
 	Reindex(ctx context.Context) error
 	GetValue(id ID) (I, error)
-	SearchByTerm(string, map[string]any) ([]I, error)
+	SearchByTerm(string, map[string]any, ...int64) ([]I, error)
 	UpdateIndex(ctx context.Context, entity E) error
 	MultipleSearch(requests []meili.SearchRequest) ([][]I, error)
 }
@@ -81,15 +81,15 @@ func (r *indexableBaseRepo[I, E, ID]) Update(ctx context.Context, entity E) erro
 	return nil
 }
 
-func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string, filters map[string]any) ([]I, error) {
+func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string, filters map[string]any, limit ...int64) ([]I, error) {
 
-	items, err := r.meili.SearchDocuments(r.indexName, term, filters)
+	items, err := r.meili.SearchDocuments(r.indexName, term, filters, limit...)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(items) == 0 && len(term) >= 3 {
-		items, err = r.meili.SearchDocuments(r.indexName, ReplaceCorrectLang(term), filters)
+		items, err = r.meili.SearchDocuments(r.indexName, ReplaceCorrectLang(term), filters, limit...)
 		if err != nil {
 			return nil, err
 		}
