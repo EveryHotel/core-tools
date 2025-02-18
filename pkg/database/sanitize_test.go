@@ -28,7 +28,7 @@ type objectWithoutDbTags struct {
 
 var _ = Describe("Sanitize", func() {
 	var testObjWithTags sanitizeTestCase
-	var clock clockwork.FakeClock
+	var clock *clockwork.FakeClock
 	var fakeNow time.Time
 
 	BeforeEach(func() {

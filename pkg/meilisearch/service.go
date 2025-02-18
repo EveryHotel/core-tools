@@ -13,18 +13,18 @@ type MeiliService interface {
 	DeleteDocument(string, string) error
 	GetDocument(string, string, any) error
 	SearchDocuments(indexName string, q string, filters map[string]any, limit ...int64) ([]any, error)
-	MultipleSearchDocuments(requests []meilisearch.SearchRequest) ([]any, error)
+	MultipleSearchDocuments(requests []*meilisearch.SearchRequest) ([]any, error)
 	UpdateDocuments(string, any, *meilisearch.Settings) error
 }
 
-func NewMeiliService(client *meilisearch.Client) MeiliService {
+func NewMeiliService(client meilisearch.ServiceManager) MeiliService {
 	return &meiliService{
 		client: client,
 	}
 }
 
 type meiliService struct {
-	client *meilisearch.Client
+	client meilisearch.ServiceManager
 }
 
 func (s meiliService) AddDocuments(indexName string, documents any, settings *meilisearch.Settings) error {
@@ -116,7 +116,7 @@ func (s meiliService) SearchDocuments(indexName string, q string, filters map[st
 	return resp.Hits, nil
 }
 
-func (s meiliService) MultipleSearchDocuments(requests []meilisearch.SearchRequest) ([]any, error) {
+func (s meiliService) MultipleSearchDocuments(requests []*meilisearch.SearchRequest) ([]any, error) {
 	response, err := s.client.MultiSearch(&meilisearch.MultiSearchRequest{
 		Queries: requests,
 	})

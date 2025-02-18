@@ -137,11 +137,14 @@ func (s *amqpService) runConsumer(consumerService ConsumerService) error {
 	}
 
 	consumer, err := rabbitmq.NewConsumer(s.connection,
-		handler,
 		consumerService.GetQueueName(),
 		opts...,
 	)
 
+	if err != nil {
+		return err
+	}
+	err = consumer.Run(handler)
 	if err != nil {
 		return err
 	}

@@ -25,7 +25,7 @@ type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface 
 	GetValue(id ID) (I, error)
 	SearchByTerm(string, map[string]any, ...int64) ([]I, error)
 	UpdateIndex(ctx context.Context, entity E) error
-	MultipleSearch(requests []meili.SearchRequest) ([][]I, error)
+	MultipleSearch(requests []*meili.SearchRequest) ([][]I, error)
 }
 
 type indexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] struct {
@@ -109,7 +109,7 @@ func (r *indexableBaseRepo[I, E, ID]) SearchByTerm(term string, filters map[stri
 	return res, nil
 }
 
-func (r *indexableBaseRepo[I, E, ID]) MultipleSearch(requests []meili.SearchRequest) ([][]I, error) {
+func (r *indexableBaseRepo[I, E, ID]) MultipleSearch(requests []*meili.SearchRequest) ([][]I, error) {
 	for i := range requests {
 		requests[i].IndexUID = r.indexName
 	}
