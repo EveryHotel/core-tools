@@ -113,10 +113,6 @@ func (s *amqpService) runConsumer(consumerService ConsumerService) error {
 		}
 	}
 
-	if err != nil {
-		return err
-	}
-
 	handler := func(message rabbitmq.Delivery) rabbitmq.Action {
 		return s.handleMessage(message, consumerService)
 	}
@@ -144,10 +140,13 @@ func (s *amqpService) runConsumer(consumerService ConsumerService) error {
 	if err != nil {
 		return err
 	}
-	err = consumer.Run(handler)
-	if err != nil {
-		return err
-	}
+
+	go func() {
+		err = consumer.Run(handler)
+		if err != nil {
+			slog.Error("consumer.Run: %v", err)
+		}
+	}()
 
 	s.internalConsumers = append(s.internalConsumers, consumer)
 	return nil
