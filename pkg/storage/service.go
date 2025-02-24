@@ -11,20 +11,20 @@ import (
 )
 
 type StorageService interface {
-	Save(path string, mimeType string, file io.Reader) (int64, error)
-	Get(path string) (io.ReadCloser, error)
-	Delete(path string, recursive bool) error
-	List() ([]string, error)
-	GetUrl(path string) (string, error)
+	Save(ctx context.Context, path string, mimeType string, file io.Reader) (int64, error)
+	Get(ctx context.Context, path string) (io.ReadCloser, error)
+	Delete(ctx context.Context, path string, recursive bool) error
+	List(ctx context.Context) ([]string, error)
+	GetUrl(ctx context.Context, path string) (string, error)
 }
 
 type StorageManagerService interface {
 	Upload(ctx context.Context, storageName string, uploadPrefix string, realName string, file io.Reader) (FileInfo, error)
 	UploadWithFileName(ctx context.Context, storageName, uploadPrefix, fileName, mimeType string, file io.Reader, storagePath string) (string, int64, error)
-	GetUrl(storageName string, path string) (string, error)
-	Get(storageName string, path string) (io.ReadCloser, error)
-	Delete(storageName string, path string, recursive bool) error
-	ListFiles(storageName string) ([]string, error)
+	GetUrl(ctx context.Context, storageName string, path string) (string, error)
+	Get(ctx context.Context, storageName string, path string) (io.ReadCloser, error)
+	Delete(ctx context.Context, storageName string, path string, recursive bool) error
+	ListFiles(ctx context.Context, storageName string) ([]string, error)
 }
 
 type FileInfo struct {
@@ -102,7 +102,7 @@ func (s *fileService) UploadWithFileName(ctx context.Context, storageName string
 		location = storagePath
 	}
 
-	size, err := storageService.Save(location, mimeType, file)
+	size, err := storageService.Save(ctx, location, mimeType, file)
 	if err != nil {
 		return "", size, err
 	}
@@ -111,41 +111,41 @@ func (s *fileService) UploadWithFileName(ctx context.Context, storageName string
 }
 
 // GetUrl - получает ссылку на файл в хранилище
-func (s *fileService) GetUrl(storageName string, path string) (string, error) {
+func (s *fileService) GetUrl(ctx context.Context, storageName string, path string) (string, error) {
 	storageService, ok := s.storages[storageName]
 	if ok != true {
 		return "", fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
 	}
 
-	return storageService.GetUrl(path)
+	return storageService.GetUrl(ctx, path)
 }
 
 // Get - получает содержимое файла из хранилища
-func (s *fileService) Get(storageName string, path string) (io.ReadCloser, error) {
+func (s *fileService) Get(ctx context.Context, storageName string, path string) (io.ReadCloser, error) {
 	storageService, ok := s.storages[storageName]
 	if ok != true {
 		return nil, fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
 	}
 
-	return storageService.Get(path)
+	return storageService.Get(ctx, path)
 }
 
 // Delete - удаляет файл в хранилище
-func (s *fileService) Delete(storageName string, path string, recursive bool) error {
+func (s *fileService) Delete(ctx context.Context, storageName string, path string, recursive bool) error {
 	storageService, ok := s.storages[storageName]
 	if ok != true {
 		return fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
 	}
 
-	return storageService.Delete(path, recursive)
+	return storageService.Delete(ctx, path, recursive)
 }
 
 // ListFiles - выводит список файлов в хранилище
-func (s *fileService) ListFiles(storageName string) ([]string, error) {
+func (s *fileService) ListFiles(ctx context.Context, storageName string) ([]string, error) {
 	storageService, ok := s.storages[storageName]
 	if ok != true {
 		return nil, fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
 	}
 
-	return storageService.List()
+	return storageService.List(ctx)
 }

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -23,7 +24,7 @@ func NewLocalStorage(directory string, urlPrefix string) StorageService {
 	}
 }
 
-func (s *localStorage) Save(path string, mimeType string, file io.Reader) (int64, error) {
+func (s *localStorage) Save(ctx context.Context, path string, mimeType string, file io.Reader) (int64, error) {
 	apath, err := s.getAbsolute(path)
 	if err != nil {
 		return 0, err
@@ -43,7 +44,7 @@ func (s *localStorage) Save(path string, mimeType string, file io.Reader) (int64
 	return bytesNumber, err
 }
 
-func (s *localStorage) Get(path string) (io.ReadCloser, error) {
+func (s *localStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
 	apath, err := s.getAbsolute(path)
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func (s *localStorage) Get(path string) (io.ReadCloser, error) {
 	return f, nil
 }
 
-func (s *localStorage) Delete(path string, recursive bool) error {
+func (s *localStorage) Delete(ctx context.Context, path string, recursive bool) error {
 	apath, err := s.getAbsolute(path)
 	if err != nil {
 		return err
@@ -70,7 +71,7 @@ func (s *localStorage) Delete(path string, recursive bool) error {
 	}
 }
 
-func (s *localStorage) List() ([]string, error) {
+func (s *localStorage) List(ctx context.Context) ([]string, error) {
 	var fileNames []string
 
 	err := filepath.Walk(s.directory, func(path string, info os.FileInfo, err error) error {
@@ -92,7 +93,7 @@ func (s *localStorage) List() ([]string, error) {
 	return fileNames, nil
 }
 
-func (s *localStorage) GetUrl(p string) (string, error) {
+func (s *localStorage) GetUrl(ctx context.Context, p string) (string, error) {
 	_, err := s.getAbsolute(p)
 	if err != nil {
 		return "", nil
