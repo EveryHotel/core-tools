@@ -264,6 +264,9 @@ func setDestFields(vDest reflect.Value, scanFields []any, relations ...string) [
 		if tag.Get("db") != "" {
 			scanFields = append(scanFields, field.Addr().Interface())
 		}
+		if tag.Get("embedded_struct") == "1" && field.Kind() == reflect.Struct {
+			scanFields = setDestFields(field, scanFields)
+		}
 	}
 
 	return scanFields

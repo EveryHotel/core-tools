@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 
 	"github.com/wagslane/go-rabbitmq"
@@ -144,7 +145,7 @@ func (s *amqpService) runConsumer(consumerService ConsumerService) error {
 	go func() {
 		err = consumer.Run(handler)
 		if err != nil {
-			slog.Error("consumer.Run: %v", err)
+			slog.Error(fmt.Sprintf("consumer.Run: %v", err))
 		}
 	}()
 

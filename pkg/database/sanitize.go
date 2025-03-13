@@ -29,9 +29,7 @@ func Sanitize(dest any, opts ...SanitizeOption) []any {
 		typeField := vDest.Type().Field(i)
 		tag := typeField.Tag
 
-		if tagVal := tag.Get("db"); tagVal != "" {
-			cols = append(cols, tagVal)
-		}
+		cols = append(cols, fetchColumns(typeField)...)
 
 		if tagVal := tag.Get("relation"); tagVal != "" {
 			relationsField := strings.Split(tag.Get("relation"), ",")
@@ -56,6 +54,22 @@ func Sanitize(dest any, opts ...SanitizeOption) []any {
 	}
 
 	return optHandler.GetCols()
+}
+
+func fetchColumns(typeField reflect.StructField) []any {
+	var cols []any
+	if tagVal := typeField.Tag.Get("db"); tagVal != "" {
+		cols = append(cols, tagVal)
+	}
+
+	embeddedStruct := typeField.Tag.Get("embedded_struct")
+	if embeddedStruct == "1" && typeField.Type.Kind() == reflect.Struct {
+		for i := 0; i < typeField.Type.NumField(); i++ {
+			cols = append(cols, fetchColumns(typeField.Type.Field(i))...)
+		}
+	}
+
+	return cols
 }
 
 func newSanitizeOptionHandler(cols []any, relationDests []any, relations []string, posRelations []int) *sanitizeOptionHandler {
