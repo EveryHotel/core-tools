@@ -177,6 +177,14 @@ func SanitizeRows(entity any, clock clockwork.Clock, opts ...SanitizeRowsOption)
 				rows[dbFieldName] = vEntity.Field(i).Interface()
 			}
 		}
+		embeddedStruct := tag.Get("embedded_struct")
+		if embeddedStruct == "1" {
+			embeddedEntity := vEntity.Field(i).Interface()
+			_, embeddedRows := SanitizeRows(embeddedEntity, clock, opts...)
+			for key, val := range embeddedRows {
+				rows[key] = val
+			}
+		}
 	}
 
 	for _, tsField := range handler.DefaultTimestamps {

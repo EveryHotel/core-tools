@@ -49,6 +49,17 @@ func SanitizeRows[ID int64 | string](entity interface{}, opts ...SanitizeRowsOpt
 	for i := 0; i < vEntity.NumField(); i++ {
 		tag := vEntity.Type().Field(i).Tag
 
+		embeddedStruct := tag.Get("embedded_struct")
+		if embeddedStruct == "1" {
+			embeddedEntity := vEntity.Field(i).Interface()
+			_, embeddedRows := SanitizeRows[ID](embeddedEntity, opts...)
+			for key, val := range embeddedRows {
+				rows[key] = val
+			}
+
+			continue
+		}
+
 		dbFieldName := tag.Get("db")
 		if dbFieldName == "" {
 			continue
