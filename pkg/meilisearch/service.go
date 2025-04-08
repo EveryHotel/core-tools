@@ -8,13 +8,14 @@ import (
 )
 
 type MeiliService interface {
-	AddDocuments(string, any, *meilisearch.Settings) error
+	AddDocuments(string, any) error
 	Clear(string) error
 	DeleteDocument(string, string) error
 	GetDocument(string, string, any) error
 	SearchDocuments(indexName string, q string, filters map[string]any, limit ...int64) ([]any, error)
 	MultipleSearchDocuments(requests []*meilisearch.SearchRequest) ([]any, error)
-	UpdateDocuments(string, any, *meilisearch.Settings) error
+	UpdateDocuments(string, any) error
+	UpdateSettings(string, *meilisearch.Settings) error
 }
 
 func NewMeiliService(client meilisearch.ServiceManager) MeiliService {
@@ -27,7 +28,7 @@ type meiliService struct {
 	client meilisearch.ServiceManager
 }
 
-func (s meiliService) AddDocuments(indexName string, documents any, settings *meilisearch.Settings) error {
+func (s meiliService) AddDocuments(indexName string, documents any) error {
 	encoded, err := json.Marshal(documents)
 	if err != nil {
 		return err
@@ -37,12 +38,6 @@ func (s meiliService) AddDocuments(indexName string, documents any, settings *me
 	_, err = index.AddDocuments(encoded, "id")
 	if err != nil {
 		return err
-	}
-
-	if settings != nil {
-		if _, err = index.UpdateSettings(settings); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -70,7 +65,7 @@ func (s meiliService) GetDocument(indexName string, id string, entity any) error
 	return index.GetDocument(id, nil, entity)
 }
 
-func (s meiliService) UpdateDocuments(indexName string, documents any, settings *meilisearch.Settings) error {
+func (s meiliService) UpdateDocuments(indexName string, documents any) error {
 	encoded, err := json.Marshal(documents)
 	if err != nil {
 		return err
@@ -80,12 +75,6 @@ func (s meiliService) UpdateDocuments(indexName string, documents any, settings 
 	_, err = index.UpdateDocuments(encoded, "id")
 	if err != nil {
 		return err
-	}
-
-	if settings != nil {
-		if _, err = index.UpdateSettings(settings); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -130,4 +119,14 @@ func (s meiliService) MultipleSearchDocuments(requests []*meilisearch.SearchRequ
 	}
 
 	return res, nil
+}
+
+func (s meiliService) UpdateSettings(indexName string, settings *meilisearch.Settings) error {
+	index := s.client.Index(indexName)
+	_, err := index.UpdateSettings(settings)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -157,7 +157,7 @@ func (r *indexableBaseRepo[I, E, ID]) UpdateIndex(ctx context.Context, entity E)
 		return nil
 	}
 
-	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex(), r.meiliSettings); err != nil {
+	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex()); err != nil {
 		slog.ErrorContext(ctx, "update document error",
 			slog.Any("error", err),
 			slog.String("index", r.indexName),
@@ -189,6 +189,11 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 	}
 	sortRule := WithSort([]exp.OrderedExpression{goqu.I(r.alias + ".id").Asc()})
 
+	err = r.meili.UpdateSettings(r.indexName, r.meiliSettings)
+	if err != nil {
+		return err
+	}
+
 	for {
 		opts := []ListOption{
 			WithLimit(limit),
@@ -213,7 +218,7 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 			data = append(data, item.GetModelIndex())
 		}
 
-		if err = r.meili.AddDocuments(r.indexName, data, r.meiliSettings); err != nil {
+		if err = r.meili.AddDocuments(r.indexName, data); err != nil {
 			return err
 		}
 
