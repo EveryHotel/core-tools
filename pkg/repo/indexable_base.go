@@ -189,9 +189,11 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 	}
 	sortRule := WithSort([]exp.OrderedExpression{goqu.I(r.alias + ".id").Asc()})
 
-	err = r.meili.UpdateSettings(r.indexName, r.meiliSettings)
-	if err != nil {
-		return err
+	if r.meiliSettings != nil {
+		err = r.meili.UpdateSettings(r.indexName, r.meiliSettings)
+		if err != nil {
+			return err
+		}
 	}
 
 	for {
