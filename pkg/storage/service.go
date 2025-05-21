@@ -13,6 +13,7 @@ import (
 type StorageService interface {
 	Save(ctx context.Context, path string, mimeType string, file io.Reader) (int64, error)
 	Get(ctx context.Context, path string) (io.ReadCloser, error)
+	Exists(ctx context.Context, path string) (bool, error)
 	Delete(ctx context.Context, path string, recursive bool) error
 	List(ctx context.Context) ([]string, error)
 	GetUrl(ctx context.Context, path string) (string, error)
@@ -23,6 +24,7 @@ type StorageManagerService interface {
 	UploadWithFileName(ctx context.Context, storageName, uploadPrefix, fileName, mimeType string, file io.Reader, storagePath string) (string, int64, error)
 	GetUrl(ctx context.Context, storageName string, path string) (string, error)
 	Get(ctx context.Context, storageName string, path string) (io.ReadCloser, error)
+	Exists(ctx context.Context, storageName string, path string) (bool, error)
 	Delete(ctx context.Context, storageName string, path string, recursive bool) error
 	ListFiles(ctx context.Context, storageName string) ([]string, error)
 }
@@ -128,6 +130,16 @@ func (s *fileService) Get(ctx context.Context, storageName string, path string) 
 	}
 
 	return storageService.Get(ctx, path)
+}
+
+// Exist - проверяем существование файла в хранилище
+func (s *fileService) Exists(ctx context.Context, storageName string, path string) (bool, error) {
+	storageService, ok := s.storages[storageName]
+	if ok != true {
+		return false, fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
+	}
+
+	return storageService.Exists(ctx, path)
 }
 
 // Delete - удаляет файл в хранилище
