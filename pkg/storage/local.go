@@ -58,6 +58,22 @@ func (s *localStorage) Get(ctx context.Context, path string) (io.ReadCloser, err
 	return f, nil
 }
 
+func (s *localStorage) Exists(ctx context.Context, path string) (bool, error) {
+	apath, err := s.getAbsolute(path)
+	if err != nil {
+		return false, err
+	}
+
+	if _, err := os.Stat(apath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+
+		return false, err
+	}
+	return true, nil
+}
+
 func (s *localStorage) Delete(ctx context.Context, path string, recursive bool) error {
 	apath, err := s.getAbsolute(path)
 	if err != nil {

@@ -2,12 +2,15 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"path"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -99,6 +102,28 @@ func (s *s3Storage) Get(ctx context.Context, path string) (io.ReadCloser, error)
 		return nil, err
 	}
 	return output.Body, nil
+}
+
+func (s *s3Storage) Exists(ctx context.Context, path string) (bool, error) {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	get := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(path),
+	}
+	_, err = client.HeadObject(ctx, get)
+	if err != nil {
+		var responseError *awshttp.ResponseError
+		if errors.As(err, &responseError) && responseError.ResponseError.HTTPStatusCode() == http.StatusNotFound {
+			return false, nil
+		}
+
+		return false, err
+	}
+	return true, nil
 }
 
 func (s *s3Storage) GetUrl(ctx context.Context, file string) (string, error) {
