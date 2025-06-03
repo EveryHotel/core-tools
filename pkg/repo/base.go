@@ -2,12 +2,14 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
+	"github.com/jackc/pgx/v4"
 
 	"github.com/EveryHotel/core-tools/pkg/database"
 )
@@ -184,11 +186,13 @@ func (r *baseRepo[T, ID]) GetOneBy(ctx context.Context, conditions map[string]an
 	}
 
 	if err = r.db.SelectOne(ctx, sql, args, &entity, relationAliases...); err != nil {
-		slog.ErrorContext(ctx, "Error during exec select",
-			slog.Any("error", err),
-			slog.String("table", r.tableName),
-			slog.Any("conditions", conditions),
-		)
+		if !errors.Is(err, pgx.ErrNoRows) {
+			slog.ErrorContext(ctx, "Error during exec select",
+				slog.Any("error", err),
+				slog.String("table", r.tableName),
+				slog.Any("conditions", conditions),
+			)
+		}
 		return entity, err
 	}
 
@@ -435,6 +439,9 @@ func (r *baseRepo[T, ID]) CreateMultiple(ctx context.Context, entities []T) ([]I
 func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) error {
 	var records []any
 	var columns []string
+
+	existsIds := make(map[ID]bool)
+
 	for _, entity := range entities {
 		id, rows := SanitizeRowsForUpdateMultiple[ID](entity)
 		if len(columns) == 0 {
@@ -442,6 +449,15 @@ func (r *baseRepo[T, ID]) UpdateMultiple(ctx context.Context, entities []T) erro
 				columns = append(columns, k)
 			}
 		}
+		if existsIds[id] {
+			slog.WarnContext(ctx, "duplicate id for multiple update",
+				slog.Any("id", id),
+				slog.String("table", r.tableName),
+			)
+			continue
+		}
+
+		existsIds[id] = true
 
 		rows[r.idColumn] = id
 
