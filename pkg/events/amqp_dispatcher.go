@@ -51,12 +51,11 @@ func (d *amqpDispatcher) Dispatch(
 	eventName EventName,
 	task amqp.Task,
 ) error {
-	exchange, ok := d.exchanges[eventName]
-	if !ok {
-		return fmt.Errorf("exchange %s not found", eventName)
+	if _, ok := d.exchanges[eventName]; !ok {
+		d.exchanges[eventName] = amqp.NewAmqpService(d.amqpUrl, string(eventName), amqp091.ExchangeFanout)
 	}
 
-	return exchange.Publish(task, []string{string(eventName)})
+	return d.exchanges[eventName].Publish(task, []string{string(eventName)})
 }
 
 func (d *amqpDispatcher) Serve() error {
