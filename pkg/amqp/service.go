@@ -8,6 +8,11 @@ import (
 	"github.com/wagslane/go-rabbitmq"
 )
 
+// TODO everyHotel
+//  Добавлены новые методы
+//  Есть различия в реализации методов Publish и runConsumer
+//  В момент перехода на эту либу надо это все проверить.
+
 type AmqpService interface {
 	AddConsumer(ConsumerService)
 	Publish(Task, []string) error

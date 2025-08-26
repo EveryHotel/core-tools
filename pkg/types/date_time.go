@@ -8,7 +8,8 @@ import (
 )
 
 const DateLayout = "2006-01-02"
-const TimeLayout = "15:04:03"
+const TimeLayout = "15:04:05"
+const DateTimeLayout = "2006-01-02 15:04:05"
 const TimeHMLayout = "15:04"
 
 const TimeHMLayoutDB = "15:04:00.000000"
@@ -22,6 +23,10 @@ type Time struct {
 }
 
 type TimeHM struct {
+	time.Time
+}
+
+type DateTime struct {
 	time.Time
 }
 
@@ -99,4 +104,29 @@ func (c *TimeHM) Scan(v interface{}) error {
 
 func (c TimeHM) Value() (driver.Value, error) {
 	return c.Time.Format(TimeHMLayout), nil
+}
+
+func (c *DateTime) UnmarshalJSON(b []byte) (err error) {
+	s := strings.Trim(string(b), `"`)
+	if s == "null" {
+		return
+	}
+	c.Time, err = time.Parse(DateTimeLayout, s)
+	return
+}
+
+func (c DateTime) MarshalJSON() ([]byte, error) {
+	if c.Time.IsZero() {
+		return []byte("null"), nil
+	}
+	return []byte(fmt.Sprintf(`"%s"`, c.Time.Format(DateTimeLayout))), nil
+}
+
+func (c *DateTime) Scan(v interface{}) error {
+	c.Time = v.(time.Time)
+	return nil
+}
+
+func (c DateTime) Value() (driver.Value, error) {
+	return c.Time.Format(DateTimeLayout), nil
 }

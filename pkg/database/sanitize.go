@@ -8,6 +8,12 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
+// TODO everyHotel
+//  Здесь поддерживаем два вараинта обработки вложенных структур
+//  - через inner_struct
+//  - через embedded_struct
+//  Желательно потом привести это все к одному знаменателю
+
 type SanitizeOption func(*sanitizeOptionHandler)
 
 type sanitizeOptionHandler struct {
@@ -64,6 +70,13 @@ func fetchColumns(typeField reflect.StructField) []any {
 
 	embeddedStruct := typeField.Tag.Get("embedded_struct")
 	if embeddedStruct == "1" && typeField.Type.Kind() == reflect.Struct {
+		for i := 0; i < typeField.Type.NumField(); i++ {
+			cols = append(cols, fetchColumns(typeField.Type.Field(i))...)
+		}
+	}
+
+	// если это вложенная структура, мы собираем отдельно все ее поля и добавляем в общий список
+	if innerStruct := typeField.Tag.Get("inner_struct"); innerStruct != "" {
 		for i := 0; i < typeField.Type.NumField(); i++ {
 			cols = append(cols, fetchColumns(typeField.Type.Field(i))...)
 		}
@@ -166,6 +179,18 @@ func SanitizeRows(entity any, clock clockwork.Clock, opts ...SanitizeRowsOption)
 	rows := map[string]any{}
 	for i := 0; i < vEntity.NumField(); i++ {
 		tag := vEntity.Type().Field(i).Tag
+
+		// если это вложенная структура, мы собираем отдельно все ее поля и добавляем в общий список
+		if innerStruct := tag.Get("inner_struct"); innerStruct != "" {
+			innerPrimary, innerRows := SanitizeRows(vEntity.Field(i), clock, opts...)
+			for k, v := range innerRows {
+				rows[k] = v
+			}
+
+			primary = innerPrimary
+
+			continue
+		}
 
 		if dbFieldName := tag.Get("db"); dbFieldName != "" {
 			if pkTag := tag.Get("primary"); pkTag != "" {

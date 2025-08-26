@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime"
 	"path"
 
 	"github.com/google/uuid"
 )
+
+// TODO everyHotel
+//  Вроде ничего критичного надо будет поправить пару проектов при переходе
 
 type StorageService interface {
 	Save(ctx context.Context, path string, mimeType string, file io.Reader) (int64, error)
@@ -17,6 +21,7 @@ type StorageService interface {
 	Delete(ctx context.Context, path string, recursive bool) error
 	List(ctx context.Context) ([]string, error)
 	GetUrl(ctx context.Context, path string) (string, error)
+	FileInfo(ctx context.Context, path string) (fs.FileInfo, error)
 }
 
 type StorageManagerService interface {
@@ -160,4 +165,14 @@ func (s *fileService) ListFiles(ctx context.Context, storageName string) ([]stri
 	}
 
 	return storageService.List(ctx)
+}
+
+// FileInfo - получает информацию о файле в хранилище
+func (s *fileService) FileInfo(ctx context.Context, storageName string, path string) (fs.FileInfo, error) {
+	storageService, ok := s.storages[storageName]
+	if ok != true {
+		return nil, fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
+	}
+
+	return storageService.FileInfo(ctx, path)
 }

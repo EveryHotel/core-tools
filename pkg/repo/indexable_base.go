@@ -14,12 +14,19 @@ import (
 	"github.com/EveryHotel/core-tools/pkg/meilisearch"
 )
 
+// TODO everyHotel
+//  У методов delete create update добавились SqlQueryOption
+
 type IndexableModel[I any] interface {
 	GetModelIndex() I
 	IsDeleted() bool
 }
 
-type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface {
+type Index[ID int64 | string] interface {
+	GetIdentity() ID
+}
+
+type IndexableBaseRepo[I Index[ID], E IndexableModel[I], ID int64 | string] interface {
 	BaseRepo[E, ID]
 	Reindex(ctx context.Context) error
 	GetValue(id ID) (I, error)
@@ -28,38 +35,71 @@ type IndexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] interface 
 	MultipleSearch(requests []*meili.SearchRequest) ([][]I, error)
 }
 
-type indexableBaseRepo[I any, E IndexableModel[I], ID int64 | string] struct {
+type indexableBaseRepo[I Index[ID], E IndexableModel[I], ID int64 | string] struct {
 	BaseRepo[E, ID]
-	meili          meilisearch.MeiliService
-	indexName      string
-	alias          string
-	setId          func(ptr *E, id ID)
-	indexRelations []ListOptionRelation
-	meiliSettings  *meili.Settings
+	meili                meilisearch.MeiliService
+	indexName            string
+	alias                string
+	setId                func(ptr *E, id ID)
+	extendIndexableItems func([]E) ([]E, error)
+	indexRelations       []ListOptionRelation
+	meiliSettings        *meili.Settings
 }
 
-func NewIndexableRepository[I any, E IndexableModel[I], ID int64 | string](
+func NewIndexableRepository[I Index[ID], E IndexableModel[I], ID int64 | string](
 	db database.DBService,
 	meili meilisearch.MeiliService,
 	indexName, tableName, alias, idColumn string,
 	setId func(ptr *E, id ID),
+	extendIndexableItems func([]E) ([]E, error),
 	indexRelations []ListOptionRelation,
 	meiSettings *meili.Settings,
 ) IndexableBaseRepo[I, E, ID] {
 	return &indexableBaseRepo[I, E, ID]{
-		BaseRepo:       NewRepository[E, ID](db, tableName, alias, idColumn),
-		meili:          meili,
-		indexName:      indexName,
-		alias:          alias,
-		setId:          setId,
-		indexRelations: indexRelations,
-		meiliSettings:  meiSettings,
+		BaseRepo:             NewRepository[E, ID](db, tableName, alias, idColumn),
+		meili:                meili,
+		indexName:            indexName,
+		alias:                alias,
+		setId:                setId,
+		extendIndexableItems: extendIndexableItems,
+		indexRelations:       indexRelations,
+		meiliSettings:        meiSettings,
 	}
 }
 
+// List возвращает список сущностей
+func (r *indexableBaseRepo[I, E, ID]) List(ctx context.Context, options ...SqlQueryOption) ([]E, error) {
+	res, err := r.BaseRepo.List(ctx, options...)
+	if err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
+// ListBy возвращает список сущностей по критерию
+func (r *indexableBaseRepo[I, E, ID]) ListBy(ctx context.Context, criteria map[string]any, options ...ListOption) ([]E, error) {
+	res, err := r.BaseRepo.ListBy(ctx, criteria, options...)
+	if err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
+// ListByExpression возвращает список сущностей по выражению
+func (r *indexableBaseRepo[I, E, ID]) ListByExpression(ctx context.Context, criteria exp.ExpressionList, options ...ListOption) ([]E, error) {
+	res, err := r.BaseRepo.ListByExpression(ctx, criteria, options...)
+	if err != nil {
+		return res, err
+	}
+
+	return res, nil
+}
+
 // Create Создает новую сущность
-func (r *indexableBaseRepo[I, E, ID]) Create(ctx context.Context, entity E) (ID, error) {
-	id, err := r.BaseRepo.Create(ctx, entity)
+func (r *indexableBaseRepo[I, E, ID]) Create(ctx context.Context, entity E, options ...SqlQueryOption) (ID, error) {
+	id, err := r.BaseRepo.Create(ctx, entity, options...)
 	if err != nil {
 		return id, err
 	}
@@ -71,8 +111,8 @@ func (r *indexableBaseRepo[I, E, ID]) Create(ctx context.Context, entity E) (ID,
 }
 
 // Update Обновляет сущность
-func (r *indexableBaseRepo[I, E, ID]) Update(ctx context.Context, entity E) error {
-	if err := r.BaseRepo.Update(ctx, entity); err != nil {
+func (r *indexableBaseRepo[I, E, ID]) Update(ctx context.Context, entity E, options ...SqlQueryOption) error {
+	if err := r.BaseRepo.Update(ctx, entity, options...); err != nil {
 		return err
 	}
 
@@ -215,6 +255,13 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 			break
 		}
 
+		if r.extendIndexableItems != nil {
+			items, err = r.extendIndexableItems(items)
+			if err != nil {
+				return err
+			}
+		}
+
 		var data []any
 		for _, item := range items {
 			data = append(data, item.GetModelIndex())
@@ -231,8 +278,8 @@ func (r *indexableBaseRepo[I, E, ID]) Reindex(ctx context.Context) error {
 }
 
 // Delete удаляет сущность
-func (r *indexableBaseRepo[I, E, ID]) Delete(ctx context.Context, id ID) error {
-	if err := r.BaseRepo.Delete(ctx, id); err != nil {
+func (r *indexableBaseRepo[I, E, ID]) Delete(ctx context.Context, id ID, options ...SqlQueryOption) error {
+	if err := r.BaseRepo.Delete(ctx, id, options...); err != nil {
 		return err
 	}
 

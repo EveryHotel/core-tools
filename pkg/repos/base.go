@@ -12,6 +12,9 @@ import (
 	"github.com/EveryHotel/core-tools/pkg/elastic"
 )
 
+// TODO everyHotel
+//  не возвращаются ошибки в методах, но вроде как этот Repo  нигде не используется
+
 type BaseRepoInterface interface {
 	Delete(ctx context.Context, id int64) error
 	BulkUpdate(ctx context.Context, updateFields, where map[string]interface{}) error

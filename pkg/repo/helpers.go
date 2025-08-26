@@ -5,8 +5,14 @@ import (
 	"time"
 )
 
+// TODO everyHotel
+//  Здесь поддерживаем два вараинта обработки вложенных структур
+//  - через inner_struct
+//  - через embedded_struct
+//  Желательно потом привести это все к одному знаменателю
+
 // SanitizeRowsForInsert возвращает объект с полями для добавления сущности
-func SanitizeRowsForInsert[ID int64 | string](entity interface{}) (ID, map[string]interface{}) {
+func SanitizeRowsForInsert[ID int64 | string](entity any) (ID, map[string]any) {
 	opts := []SanitizeRowsOption{
 		WithDefaultTimestamps("created_at", "updated_at"),
 	}
@@ -15,7 +21,7 @@ func SanitizeRowsForInsert[ID int64 | string](entity interface{}) (ID, map[strin
 }
 
 // SanitizeRowsForUpdate возвращает объект с полями для обновления сущности
-func SanitizeRowsForUpdate[ID int64 | string](entity interface{}) (ID, map[string]interface{}) {
+func SanitizeRowsForUpdate[ID int64 | string](entity any) (ID, map[string]any) {
 	opts := []SanitizeRowsOption{
 		WithSkippingFields("created_at"),
 		WithDefaultTimestamps("updated_at"),
@@ -36,7 +42,7 @@ func SanitizeRowsForUpdateMultiple[ID int64 | string](entity interface{}) (ID, m
 type SanitizeRowsOption func(*sanitizeRowsHandler)
 
 // SanitizeRows возвращает объект с полями для добавления сущности
-func SanitizeRows[ID int64 | string](entity interface{}, opts ...SanitizeRowsOption) (ID, map[string]interface{}) {
+func SanitizeRows[ID int64 | string](entity any, opts ...SanitizeRowsOption) (ID, map[string]any) {
 	handler := &sanitizeRowsHandler{}
 	for _, opt := range opts {
 		opt(handler)
@@ -45,7 +51,7 @@ func SanitizeRows[ID int64 | string](entity interface{}, opts ...SanitizeRowsOpt
 	vEntity := reflect.ValueOf(entity)
 
 	var primary ID
-	rows := map[string]interface{}{}
+	rows := map[string]any{}
 	for i := 0; i < vEntity.NumField(); i++ {
 		tag := vEntity.Type().Field(i).Tag
 
@@ -56,6 +62,18 @@ func SanitizeRows[ID int64 | string](entity interface{}, opts ...SanitizeRowsOpt
 			for key, val := range embeddedRows {
 				rows[key] = val
 			}
+
+			continue
+		}
+
+		// если это вложенная структура, мы собираем отдельно все ее поля и добавляем в общий список
+		if innerStruct := tag.Get("inner_struct"); innerStruct != "" {
+			innerPrimary, innerRows := SanitizeRows[ID](vEntity.Field(i).Interface(), opts...)
+			for k, v := range innerRows {
+				rows[k] = v
+			}
+
+			primary = innerPrimary
 
 			continue
 		}
@@ -121,7 +139,7 @@ func (h *sanitizeRowsHandler) SetDefaultTimestamps(fields []string) {
 }
 
 // IsSoftDeletingEntity проверяет является ли сущность доступной для soft удаления
-func IsSoftDeletingEntity(entity interface{}) bool {
+func IsSoftDeletingEntity(entity any) bool {
 	vEntity := reflect.ValueOf(entity)
 
 	fieldValue, found := vEntity.Type().FieldByName("DeletedAt")

@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -97,6 +99,7 @@ func (s *s3Storage) Get(ctx context.Context, path string) (io.ReadCloser, error)
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(path),
 	}
+
 	output, err := client.GetObject(ctx, get)
 	if err != nil {
 		return nil, err
@@ -212,7 +215,66 @@ func (s *s3Storage) List(ctx context.Context) ([]string, error) {
 	}
 	var fileNames []string
 	for _, obj := range objects.Contents {
+		if obj.Key == nil {
+			continue
+		}
+
 		fileNames = append(fileNames, aws.ToString(obj.Key))
 	}
 	return fileNames, nil
+}
+
+func (s *s3Storage) FileInfo(ctx context.Context, path string) (os.FileInfo, error) {
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(path),
+	}
+
+	output, err := client.HeadObject(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	size := int64(0)
+	if output.ContentLength != nil {
+		size = *output.ContentLength
+	}
+	return &s3FileInfo{
+		key:  path,
+		size: size,
+	}, nil
+}
+
+type s3FileInfo struct {
+	key  string
+	size int64
+}
+
+func (s *s3FileInfo) Name() string {
+	return path.Base(s.key)
+}
+
+func (s *s3FileInfo) Size() int64 {
+	return s.size
+}
+
+func (s *s3FileInfo) Mode() os.FileMode {
+	return os.ModePerm
+}
+
+func (s *s3FileInfo) ModTime() time.Time {
+	return time.Now()
+}
+
+func (s *s3FileInfo) IsDir() bool {
+	return false
+}
+
+func (s *s3FileInfo) Sys() interface{} {
+	return nil
 }

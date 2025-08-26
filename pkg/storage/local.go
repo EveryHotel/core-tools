@@ -133,3 +133,12 @@ func (s *localStorage) getAbsolute(path string) (string, error) {
 
 	return p, nil
 }
+
+func (s *localStorage) FileInfo(ctx context.Context, path string) (os.FileInfo, error) {
+	apath, err := s.getAbsolute(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return os.Stat(apath)
+}

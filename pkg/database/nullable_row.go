@@ -6,7 +6,14 @@ import (
 	"time"
 
 	"github.com/guregu/null"
+	"github.com/shopspring/decimal"
 )
+
+// TODO everyHotel
+//  Здесь поддерживаем два вараинта обработки вложенных структур
+//  - через inner_struct
+//  - через embedded_struct
+//  Желательно потом привести это все к одному знаменателю
 
 // DestHasNullableRelations проверяем, есть ли сущности join с nullable
 func DestHasNullableRelations(vDest reflect.Value, relations ...string) bool {
@@ -51,6 +58,9 @@ func TransformDestToNullable(field reflect.Value) any {
 		if field.Type().Name() == reflect.TypeOf(time.Time{}).Name() {
 			newField = reflect.New(reflect.TypeOf(null.Time{})).Interface()
 		}
+		if field.Type().Name() == reflect.TypeOf(decimal.Decimal{}).Name() {
+			newField = reflect.New(reflect.TypeOf(decimal.NullDecimal{})).Interface()
+		}
 	}
 
 	return newField
@@ -77,6 +87,11 @@ func GetNullableRowFromOrigDest(vDest reflect.Value, nullable bool, relations ..
 	for i := 0; i < vDest.NumField(); i++ {
 		field := vDest.Field(i)
 		tag := vDest.Type().Field(i).Tag
+
+		if tag.Get("inner_struct") != "" {
+			innerItems := GetNullableRowFromOrigDest(field, nullable, relations...)
+			newItem = append(newItem, innerItems...)
+		}
 
 		if tag.Get("db") != "" {
 			// если vDest - nullable, то переводим его поля в null тип(для рекурсивного вызова)
@@ -173,6 +188,8 @@ func TransformNullableToDest(fieldOrig reflect.Value, field any) reflect.Value {
 	default:
 		if fieldOrig.Type().String() == reflect.TypeOf(time.Time{}).String() {
 			fieldOrig = reflect.ValueOf((*(field.(*null.Time))).Time)
+		} else if fieldOrig.Type().String() == reflect.TypeOf(decimal.Decimal{}).String() {
+			fieldOrig = reflect.ValueOf((*(field.(*decimal.NullDecimal))).Decimal)
 		} else {
 			fieldOrig = reflect.ValueOf(field).Elem()
 		}
@@ -205,6 +222,11 @@ func SetDestFromNullable(vDestOrig reflect.Value, vDest []any, nullable bool, iD
 			continue
 		}
 		field := vDest[iDest]
+
+		if tag.Get("inner_struct") != "" {
+			_, newIDest := SetDestFromNullable(fieldOrig, vDest, nullable, iDest)
+			iDest = newIDest
+		}
 
 		if tag.Get("db") != "" {
 			if nullable {

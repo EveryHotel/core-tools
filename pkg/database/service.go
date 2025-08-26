@@ -12,6 +12,16 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
+// TODO everyHotel
+//  Здесь поддерживаем два вараинта обработки вложенных структур
+//  - через inner_struct
+//  - через embedded_struct
+//  Желательно потом привести это все к одному знаменателю
+
+// TODO everyHotel
+//  Проверка ``if nullable {`` была вне цикла ``for rows.Next() {``
+//  Затем ее запихали во внутрь цикла, но проверить при обновлении правильно ли здесь все работает
+
 const CtxDbTxKey = "db_tx"
 
 type DBService interface {
@@ -259,6 +269,10 @@ func setDestFields(vDest reflect.Value, scanFields []any, relations ...string) [
 					scanFields = setDestFields(field, scanFields)
 				}
 			}
+		}
+
+		if tag.Get("inner_struct") != "" {
+			scanFields = setDestFields(field, scanFields)
 		}
 
 		if tag.Get("db") != "" {

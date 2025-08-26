@@ -27,6 +27,8 @@ require (
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/samber/slog-multi v1.4.0
 	github.com/samber/slog-sentry/v2 v2.4.0
+	github.com/shopspring/decimal v1.2.0
+	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.10.0
 	github.com/uptrace/uptrace-go v1.21.0
 	github.com/wagslane/go-rabbitmq v0.15.0

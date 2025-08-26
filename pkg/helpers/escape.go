@@ -2,6 +2,9 @@ package helpers
 
 import "fmt"
 
+// TODO everyHotel Зачем-то было сделано indexFilters[fmt.Sprintf("%s.keyword", split[0])] = split[1]
+//  Метод FilterStringToIndexFilter используется в агрегаторе, надо будет проверить
+
 func SplitWithEscaping(s string, separator, escape byte) []string {
 	var token []byte
 	var tokens []string
