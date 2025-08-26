@@ -18,6 +18,12 @@ func WithThreshold(threshold float64) OptHandler {
 	}
 }
 
+func WithFilter(filter string) OptHandler {
+	return func(o *meili.SearchRequest) {
+		o.Filter = filter
+	}
+}
+
 func ApplyOpts(search *meili.SearchRequest, opts ...OptHandler) {
 	for _, opt := range opts {
 		opt(search)
