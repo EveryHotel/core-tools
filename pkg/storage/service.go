@@ -32,6 +32,7 @@ type StorageManagerService interface {
 	Exists(ctx context.Context, storageName string, path string) (bool, error)
 	Delete(ctx context.Context, storageName string, path string, recursive bool) error
 	ListFiles(ctx context.Context, storageName string) ([]string, error)
+	FileInfo(ctx context.Context, storageName string, path string) (fs.FileInfo, error)
 }
 
 type FileInfo struct {
