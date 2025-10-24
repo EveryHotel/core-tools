@@ -9,6 +9,10 @@ import (
 type RawMessage json.RawMessage
 
 func (rm *RawMessage) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
 	buf, ok := value.([]byte)
 	if !ok {
 		return errors.New("couldn't parse to bytes")
