@@ -16,7 +16,7 @@ import (
 
 type StorageService interface {
 	Save(ctx context.Context, path string, mimeType string, file io.Reader) (int64, error)
-	Get(ctx context.Context, path string) (io.ReadCloser, error)
+	Get(ctx context.Context, path string, opts ...GetOption) (io.ReadCloser, error)
 	Exists(ctx context.Context, path string) (bool, error)
 	Delete(ctx context.Context, path string, recursive bool) error
 	List(ctx context.Context) ([]string, error)
@@ -28,7 +28,7 @@ type StorageManagerService interface {
 	Upload(ctx context.Context, storageName string, uploadPrefix string, realName string, file io.Reader) (FileInfo, error)
 	UploadWithFileName(ctx context.Context, storageName, uploadPrefix, fileName, mimeType string, file io.Reader, storagePath string) (string, int64, error)
 	GetUrl(ctx context.Context, storageName string, path string) (string, error)
-	Get(ctx context.Context, storageName string, path string) (io.ReadCloser, error)
+	Get(ctx context.Context, storageName string, path string, opts ...GetOption) (io.ReadCloser, error)
 	Exists(ctx context.Context, storageName string, path string) (bool, error)
 	Delete(ctx context.Context, storageName string, path string, recursive bool) error
 	ListFiles(ctx context.Context, storageName string) ([]string, error)
@@ -129,13 +129,13 @@ func (s *fileService) GetUrl(ctx context.Context, storageName string, path strin
 }
 
 // Get - получает содержимое файла из хранилища
-func (s *fileService) Get(ctx context.Context, storageName string, path string) (io.ReadCloser, error) {
+func (s *fileService) Get(ctx context.Context, storageName string, path string, opts ...GetOption) (io.ReadCloser, error) {
 	storageService, ok := s.storages[storageName]
 	if ok != true {
 		return nil, fmt.Errorf("file: storage \"%s\" doesn't register", storageName)
 	}
 
-	return storageService.Get(ctx, path)
+	return storageService.Get(ctx, path, opts...)
 }
 
 // Exist - проверяем существование файла в хранилище

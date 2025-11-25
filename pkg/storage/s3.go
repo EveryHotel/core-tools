@@ -89,15 +89,32 @@ func (s *s3Storage) Save(ctx context.Context, path string, mimeType string, file
 	return aws.ToInt64(result.ContentLength), nil
 }
 
-func (s *s3Storage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
+func (s *s3Storage) Get(ctx context.Context, path string, opts ...GetOption) (io.ReadCloser, error) {
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	o := applyOptions(opts)
+
 	get := &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(path),
+	}
+
+	if o.rangeFrom != nil || o.rangeTo != nil {
+		var r string
+
+		switch {
+		case o.rangeFrom != nil && o.rangeTo == nil:
+			r = fmt.Sprintf("bytes=%d-", *o.rangeFrom)
+		case o.rangeFrom == nil && o.rangeTo != nil:
+			r = fmt.Sprintf("bytes=0-%d", *o.rangeTo)
+		case o.rangeFrom != nil && o.rangeTo != nil:
+			r = fmt.Sprintf("bytes=%d-%d", *o.rangeFrom, *o.rangeTo)
+		}
+
+		get.Range = aws.String(r)
 	}
 
 	output, err := client.GetObject(ctx, get)

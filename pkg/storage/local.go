@@ -44,7 +44,7 @@ func (s *localStorage) Save(ctx context.Context, path string, mimeType string, f
 	return bytesNumber, err
 }
 
-func (s *localStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
+func (s *localStorage) Get(ctx context.Context, path string, opts ...GetOption) (io.ReadCloser, error) {
 	apath, err := s.getAbsolute(path)
 	if err != nil {
 		return nil, err
