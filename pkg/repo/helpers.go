@@ -2,7 +2,6 @@ package repo
 
 import (
 	"reflect"
-	"time"
 )
 
 // TODO everyHotel
@@ -99,7 +98,7 @@ func SanitizeRows[ID int64 | string](entity any, opts ...SanitizeRowsOption) (ID
 
 	for _, tsField := range handler.DefaultTimestamps {
 		if _, ok := rows[tsField]; ok {
-			rows[tsField] = time.Now()
+			rows[tsField] = "now()"
 		}
 	}
 
