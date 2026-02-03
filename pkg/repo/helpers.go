@@ -2,6 +2,8 @@ package repo
 
 import (
 	"reflect"
+
+	"github.com/doug-martin/goqu/v9"
 )
 
 // TODO everyHotel
@@ -98,7 +100,7 @@ func SanitizeRows[ID int64 | string](entity any, opts ...SanitizeRowsOption) (ID
 
 	for _, tsField := range handler.DefaultTimestamps {
 		if _, ok := rows[tsField]; ok {
-			rows[tsField] = "now()"
+			rows[tsField] = goqu.L("now()")
 		}
 	}
 
