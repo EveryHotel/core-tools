@@ -2,6 +2,7 @@ package repo
 
 import (
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
@@ -13,7 +14,7 @@ import (
 func BuildConflictUpdate(entity any) (string, map[string]any) {
 	updateFields := make(map[string]any)
 	var pKey string
-	var conflictTarget string
+	var conflictTargets []string
 
 	vEntity := reflect.ValueOf(entity)
 
@@ -33,7 +34,7 @@ func BuildConflictUpdate(entity any) (string, map[string]any) {
 
 		// пропускаем колонку, отмеченную как conflict_target
 		if ctTag := tag.Get("conflict_target"); ctTag != "" {
-			conflictTarget = dbFieldName
+			conflictTargets = append(conflictTargets, dbFieldName)
 			continue
 		}
 
@@ -50,9 +51,9 @@ func BuildConflictUpdate(entity any) (string, map[string]any) {
 		updateFields[dbFieldName] = goqu.C(dbFieldName).Table("excluded")
 	}
 
-	if conflictTarget == "" {
-		conflictTarget = pKey
+	if conflictTargets == nil {
+		conflictTargets = []string{pKey}
 	}
 
-	return conflictTarget, updateFields
+	return strings.Join(conflictTargets, ", "), updateFields
 }
