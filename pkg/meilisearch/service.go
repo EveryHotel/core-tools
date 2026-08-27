@@ -11,6 +11,7 @@ type MeiliService interface {
 	AddDocuments(string, any) error
 	Clear(string) error
 	DeleteDocument(string, string) error
+	DeleteDocuments(string, []string) error
 	GetDocument(string, string, any) error
 	SearchDocuments(indexName string, q string, filters map[string]any, opts ...OptHandler) ([]any, error)
 	MultipleSearchDocuments(requests []*meilisearch.SearchRequest) ([]any, error)
@@ -53,6 +54,14 @@ func (s meiliService) Clear(indexName string) error {
 
 func (s meiliService) DeleteDocument(indexName string, id string) error {
 	if _, err := s.client.Index(indexName).DeleteDocument(id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s meiliService) DeleteDocuments(indexName string, ids []string) error {
+	if _, err := s.client.Index(indexName).DeleteDocuments(ids); err != nil {
 		return err
 	}
 

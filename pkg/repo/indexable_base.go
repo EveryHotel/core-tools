@@ -40,6 +40,7 @@ type indexableBaseRepo[I Index[ID], E IndexableModel[I], ID int64 | string] stru
 	meili                meilisearch.MeiliService
 	indexName            string
 	alias                string
+	idColumn             string
 	setId                func(ptr *E, id ID)
 	extendIndexableItems func([]E) ([]E, error)
 	indexRelations       []ListOptionRelation
@@ -60,6 +61,7 @@ func NewIndexableRepository[I Index[ID], E IndexableModel[I], ID int64 | string]
 		meili:                meili,
 		indexName:            indexName,
 		alias:                alias,
+		idColumn:             idColumn,
 		setId:                setId,
 		extendIndexableItems: extendIndexableItems,
 		indexRelations:       indexRelations,
@@ -104,10 +106,21 @@ func (r *indexableBaseRepo[I, E, ID]) Create(ctx context.Context, entity E, opti
 		return id, err
 	}
 
-	r.setId(&entity, id)
-	_ = r.UpdateIndex(ctx, entity)
+	r.updateIndexByIds(ctx, []ID{id})
 
 	return id, nil
+}
+
+// CreateMultiple Создает новые сущности
+func (r *indexableBaseRepo[I, E, ID]) CreateMultiple(ctx context.Context, entities []E, options ...SqlQueryOption) ([]ID, error) {
+	ids, err := r.BaseRepo.CreateMultiple(ctx, entities, options...)
+	if err != nil {
+		return ids, err
+	}
+
+	r.updateIndexByIds(ctx, ids)
+
+	return ids, nil
 }
 
 // Update Обновляет сущность
@@ -116,7 +129,24 @@ func (r *indexableBaseRepo[I, E, ID]) Update(ctx context.Context, entity E, opti
 		return err
 	}
 
-	_ = r.UpdateIndex(ctx, entity)
+	r.updateIndexByIds(ctx, []ID{entity.GetModelIndex().GetIdentity()})
+
+	return nil
+}
+
+// UpdateMultiple Обновляет сущности
+// TODO: при conflict_target, отличном от ID, входные сущности могут не содержать ID,
+// поэтому updateIndexByIds не сможет перечитать и обновить документы в индексе.
+func (r *indexableBaseRepo[I, E, ID]) UpdateMultiple(ctx context.Context, entities []E, options ...SqlQueryOption) error {
+	if err := r.BaseRepo.UpdateMultiple(ctx, entities, options...); err != nil {
+		return err
+	}
+
+	ids := make([]ID, 0, len(entities))
+	for _, entity := range entities {
+		ids = append(ids, entity.GetModelIndex().GetIdentity())
+	}
+	r.updateIndexByIds(ctx, ids)
 
 	return nil
 }
@@ -193,19 +223,75 @@ func (r *indexableBaseRepo[I, E, ID]) GetValue(id ID) (I, error) {
 
 // UpdateIndex обновляет индекс сущности
 func (r *indexableBaseRepo[I, E, ID]) UpdateIndex(ctx context.Context, entity E) error {
-	if entity.IsDeleted() {
-		return nil
+	r.updateIndexByIds(ctx, []ID{entity.GetModelIndex().GetIdentity()})
+	return nil
+}
+
+func (r *indexableBaseRepo[I, E, ID]) updateIndexByIds(ctx context.Context, ids []ID) {
+	if len(ids) == 0 {
+		return
 	}
 
-	if err := r.meili.UpdateDocuments(r.indexName, entity.GetModelIndex()); err != nil {
-		slog.ErrorContext(ctx, "update document error",
+	options := []ListOption{}
+	if len(r.indexRelations) > 0 {
+		options = append(options, WithRelations(r.indexRelations))
+	}
+	entities, err := r.BaseRepo.ListBy(ctx, map[string]any{r.alias + "." + r.idColumn: ids}, options...)
+	if err != nil {
+		slog.ErrorContext(ctx, "load documents for index error",
 			slog.Any("error", err),
 			slog.String("index", r.indexName),
-			slog.Any("entity", entity),
+			slog.Int("count", len(ids)),
 		)
+		return
 	}
 
-	return nil
+	if r.extendIndexableItems != nil {
+		entities, err = r.extendIndexableItems(entities)
+		if err != nil {
+			slog.ErrorContext(ctx, "extend documents for index error",
+				slog.Any("error", err),
+				slog.String("index", r.indexName),
+				slog.Int("count", len(ids)),
+			)
+			return
+		}
+	}
+
+	r.updateIndexMultiple(ctx, entities)
+}
+
+func (r *indexableBaseRepo[I, E, ID]) updateIndexMultiple(ctx context.Context, entities []E) {
+	documents := make([]I, 0, len(entities))
+	deleteIds := make([]string, 0)
+	for _, entity := range entities {
+		document := entity.GetModelIndex()
+		if entity.IsDeleted() {
+			deleteIds = append(deleteIds, fmt.Sprintf("%v", document.GetIdentity()))
+			continue
+		}
+		documents = append(documents, document)
+	}
+
+	if len(documents) > 0 {
+		if err := r.meili.UpdateDocuments(r.indexName, documents); err != nil {
+			slog.ErrorContext(ctx, "update documents error",
+				slog.Any("error", err),
+				slog.String("index", r.indexName),
+				slog.Int("count", len(documents)),
+			)
+		}
+	}
+
+	if len(deleteIds) > 0 {
+		if err := r.meili.DeleteDocuments(r.indexName, deleteIds); err != nil {
+			slog.ErrorContext(ctx, "delete documents error",
+				slog.Any("error", err),
+				slog.String("index", r.indexName),
+				slog.Int("count", len(deleteIds)),
+			)
+		}
+	}
 }
 
 // Reindex переиндексация всех сущностей
