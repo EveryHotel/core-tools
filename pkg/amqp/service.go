@@ -1,6 +1,7 @@
 package amqp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ type AmqpService interface {
 	Publish(Task, []string) error
 	Serve() error
 	Close() error
+	CloseWithContext(context.Context) error
 	SetLogLevel(slog.Level)
 }
 
@@ -266,8 +268,14 @@ func (s *amqpService) handleMessage(message rabbitmq.Delivery, consumer Consumer
 }
 
 func (s *amqpService) Close() error {
+	return s.CloseWithContext(context.Background())
+}
+
+// CloseWithContext останавливает консьюмеры, дожидаясь завершения обработчиков
+// в пределах переданного контекста, а затем освобождает publisher и соединение.
+func (s *amqpService) CloseWithContext(ctx context.Context) error {
 	for _, consumer := range s.internalConsumers {
-		consumer.Close()
+		consumer.CloseWithContext(ctx)
 	}
 
 	s.pubMu.Lock()
@@ -280,13 +288,11 @@ func (s *amqpService) Close() error {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 
+	var closeErr error
 	if s.connection != nil {
-		err := s.connection.Close()
+		closeErr = s.connection.Close()
 		s.connection = nil
-		if err != nil {
-			return err
-		}
 	}
 
-	return nil
+	return errors.Join(closeErr, ctx.Err())
 }
