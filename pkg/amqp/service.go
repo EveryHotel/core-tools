@@ -70,15 +70,18 @@ func (s *amqpService) getConnection(logMsg string) (*rabbitmq.Conn, error) {
 }
 
 func (s *amqpService) resetConnection() {
+	// Порядок блокировок должен совпадать с getPublisher:
+	// сначала pubMu, затем connMu.
+	s.pubMu.Lock()
+	defer s.pubMu.Unlock()
+
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
 
-	s.pubMu.Lock()
 	if s.publisher != nil {
 		s.publisher.Close()
 		s.publisher = nil
 	}
-	s.pubMu.Unlock()
 
 	if s.connection != nil {
 		_ = s.connection.Close()
@@ -279,14 +282,15 @@ func (s *amqpService) CloseWithContext(ctx context.Context) error {
 	}
 
 	s.pubMu.Lock()
+	defer s.pubMu.Unlock()
+
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+
 	if s.publisher != nil {
 		s.publisher.Close()
 		s.publisher = nil
 	}
-	s.pubMu.Unlock()
-
-	s.connMu.Lock()
-	defer s.connMu.Unlock()
 
 	var closeErr error
 	if s.connection != nil {
